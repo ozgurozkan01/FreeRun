@@ -9,7 +9,8 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-
+#include "TraversalComponent.h"
+#include "MotionWarpingComponent.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AFreeRunCharacter
@@ -47,6 +48,10 @@ AFreeRunCharacter::AFreeRunCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
+
+	TraversalComponent = CreateDefaultSubobject<UTraversalComponent>(TEXT("TraversalComponent"));
+	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
+	
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
@@ -55,7 +60,6 @@ void AFreeRunCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
-
 	//Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
@@ -63,6 +67,16 @@ void AFreeRunCharacter::BeginPlay()
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
+	}
+
+	TraversalComponent->InitializeReferences(this, MotionWarpingComponent, FollowCamera);
+}
+
+void AFreeRunCharacter::DetectWall()
+{
+	if (TraversalComponent)
+	{
+		TraversalComponent->TriggerTraversalAction(true);
 	}
 }
 
@@ -75,7 +89,8 @@ void AFreeRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
 		//Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
+		// EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &AFreeRunCharacter::DetectWall);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		//Moving
