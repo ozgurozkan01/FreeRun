@@ -9,6 +9,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "HelperFunctions.h"
 #include "TraversalComponent.h"
 #include "MotionWarpingComponent.h"
 
@@ -71,15 +72,6 @@ void AFreeRunCharacter::BeginPlay()
 
 	TraversalComponent->InitializeReferences(this, MotionWarpingComponent, FollowCamera);
 }
-
-void AFreeRunCharacter::DetectWall()
-{
-	if (TraversalComponent)
-	{
-		TraversalComponent->TriggerTraversalAction(true);
-	}
-}
-
 //////////////////////////////////////////////////////////////////////////
 // Input
 
@@ -90,7 +82,7 @@ void AFreeRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 		
 		//Jumping
 		// EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &AFreeRunCharacter::DetectWall);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &AFreeRunCharacter::SpaceBarPressed);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		//Moving
@@ -101,6 +93,23 @@ void AFreeRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 	}
 
+}
+
+void AFreeRunCharacter::SpaceBarPressed()
+{
+	if (!TraversalComponent) { return; }
+
+	FHitResult DetectedHit = TraversalComponent->DetectWall();
+	
+	if (!DetectedHit.bBlockingHit)
+	{
+		ACharacter::Jump();
+	}
+	else
+	{
+		FRotator CurrentRotation = HelperFunc::ReverseNormal(DetectedHit.ImpactNormal);
+		TraversalComponent->GridScanner(4, 30, DetectedHit.ImpactPoint, CurrentRotation);
+	}
 }
 
 void AFreeRunCharacter::Move(const FInputActionValue& Value)
