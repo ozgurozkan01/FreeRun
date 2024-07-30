@@ -9,6 +9,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HelperFunctions.h"
+#include "AI/NavigationSystemBase.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 UTraversalComponent::UTraversalComponent() :
@@ -131,10 +132,147 @@ void UTraversalComponent::TriggerTraversalAction(bool bActionTriggered)
 	}
 }
 
+void UTraversalComponent::GridScanner(int Width, int Height, FVector BaseLocation, FRotator CurrentWorldRotation)
+{
+	UE_LOG(LogTemp, Warning, TEXT("test"));
+	WallHitsContainer.Empty();
+	
+	for (int W = 0; W <= Width; W++)
+	{
+		LineHitsContainer.Empty();
+
+		float RightValue = (W * 20) - (Width * 10);
+		FVector MovedRight = HelperFunc::MoveRight(BaseLocation, RightValue, CurrentWorldRotation);
+
+		for (int H = 0; H < Height; H++)
+		{
+			int UpValue = H * 8;
+			FVector MovedUp = HelperFunc::MoveUp(MovedRight, UpValue);
+
+			FVector StartLocation = HelperFunc::MoveBackward(MovedUp, 60, CurrentWorldRotation);
+			FVector EndLocation = HelperFunc::MoveForward(MovedUp, 60, CurrentWorldRotation);
+
+			FHitResult CurrentLineHit;
+			GetWorld()->LineTraceSingleByChannel(CurrentLineHit, StartLocation, EndLocation, ECC_Visibility);
+
+			// UKismetSystemLibrary::DrawDebugLine(this, StartLocation, EndLocation, FColor::Green);
+			UKismetSystemLibrary::DrawDebugSphere(this, CurrentLineHit.ImpactPoint, 2, 12, FColor::Cyan);
+
+			LineHitsContainer.Add(CurrentLineHit);
+		}
+
+		for (int i = 1; i < LineHitsContainer.Num(); i++)
+		{
+			float CurrentDistance = UKismetMathLibrary::Vector_Distance(LineHitsContainer[i].TraceStart, LineHitsContainer[i].TraceEnd);
+			float CurrentSelected = UKismetMathLibrary::SelectFloat(LineHitsContainer[i].Distance, CurrentDistance, LineHitsContainer[i].bBlockingHit);
+
+			float PreviousDistance = UKismetMathLibrary::Vector_Distance(LineHitsContainer[i-1].TraceStart, LineHitsContainer[i-1].TraceEnd);
+			float PreviousSelected = UKismetMathLibrary::SelectFloat(LineHitsContainer[i-1].Distance, PreviousDistance, LineHitsContainer[i-1].bBlockingHit);
+			
+		
+			float Subtract = CurrentSelected - PreviousSelected;
+
+			if (Subtract > 5)
+			{
+				WallHitsContainer.Add(LineHitsContainer[i-1]);
+				break;
+			}
+		}
+	}
+
+	if (!WallHitsContainer.IsEmpty())
+	{
+		for (int i = 0; i < WallHitsContainer.Num(); i++)
+		{
+			if (i == 0)
+			{
+				WallHitResult = WallHitsContainer[i];
+			}
+
+			else
+			{
+				float FirstDistance = UKismetMathLibrary::Vector_Distance(CharacterRef->GetActorLocation(), WallHitResult.ImpactPoint);
+				float SecondDistance = UKismetMathLibrary::Vector_Distance(WallHitsContainer[i].ImpactPoint, CharacterRef->GetActorLocation());
+
+				if (SecondDistance <= FirstDistance)
+				{
+					WallHitResult = WallHitsContainer[i];
+				}
+			}
+		}
+
+		DrawDebugSphere(GetWorld(), WallHitResult.ImpactPoint, 2, 15, FColor::Red);
+
+		if (WallHitResult.bBlockingHit && !WallHitResult.bStartPenetrating)
+		{
+			if (TraversalState != ETraversalState::StateClimb)
+			{
+				WallRotation = HelperFunc::ReverseNormal(WallHitResult.ImpactNormal);
+			}
+
+			for (int i = 0; i < 8; i++)
+			{
+				FVector MovedForward = HelperFunc::MoveForward(WallHitResult.ImpactPoint, i * 30, WallRotation);
+				FVector StartLocation = HelperFunc::MoveUp(MovedForward, 7);
+				FVector EndLocation = HelperFunc::MoveDown(StartLocation, 7);
+
+				FHitResult TopHitResult;
+				bool LineTraceReturnValue = GetWorld()->LineTraceSingleByChannel(TopHitResult, StartLocation, EndLocation, ECC_Visibility);
+				// UKismetSystemLibrary::DrawDebugLine(this, StartLocation, EndLocation, FColor::Green);
+
+				if (i == 0)
+				{
+					if (LineTraceReturnValue)
+					{
+						WallTopResult = TopHitResult;
+						DrawDebugSphere(GetWorld(), WallTopResult.ImpactPoint, 5, 15, FColor::Yellow);
+					}
+				}
+				else
+				{
+					if (LineTraceReturnValue)
+					{
+						LastWallTopResult = TopHitResult;	
+						DrawDebugSphere(GetWorld(), LastWallTopResult.ImpactPoint, 5, 15, FColor::Black);
+					}
+					else
+					{
+						if (TraversalState == ETraversalState::StateFreeRoam)
+						{
+							FHitResult DepthHitResult;
+							FVector DepthStart = HelperFunc::MoveForward(LastWallTopResult.ImpactPoint, 30, WallRotation);
+							FVector DepthEnd = LastWallTopResult.ImpactPoint;
+							if (GetWorld()->LineTraceSingleByChannel(DepthHitResult, DepthStart, DepthEnd, ECC_Visibility))
+							{
+								WallDepthResult = DepthHitResult;								
+							}
+						}
+
+						DrawDebugSphere(GetWorld(), WallDepthResult.ImpactPoint, 5, 15, FColor::White);
+
+						FVector VaultForward = HelperFunc::MoveForward(WallDepthResult.ImpactPoint, 70, WallRotation);
+
+						FHitResult VaultHitResult;
+						FVector VaultEnd = HelperFunc::MoveDown(VaultForward, 200);
+
+						if (GetWorld()->LineTraceSingleByChannel(VaultHitResult, VaultForward, VaultEnd, ECC_Visibility))
+						{
+							WallVaultResult = VaultHitResult;
+						}
+
+						DrawDebugSphere(GetWorld(), WallVaultResult.ImpactPoint, 5, 15, FColor::Magenta);
+						
+						break;
+					}
+				}
+			}
+		}
+	}
+}
+
 FHitResult UTraversalComponent::DetectWall()
 {
 	FHitResult HitResult;
-
 	if (MovementComponent)
 	{
 		int32 LastIndex = UKismetMathLibrary::SelectInt(8, 15, MovementComponent->IsFalling());
@@ -142,18 +280,18 @@ FHitResult UTraversalComponent::DetectWall()
 		{
 			FRotator CharacterRotation = CharacterRef->GetActorRotation();
 			FVector CharacterLocation = CharacterRef->GetActorLocation();
-			FVector MovedDown = MoveDown(CharacterLocation, 60);
-			FVector MovedUp = MoveUp(MovedDown,i * 16);
+			FVector MovedDown = HelperFunc::MoveDown(CharacterLocation, 60);
+			FVector MovedUp = HelperFunc::MoveUp(MovedDown,i * 16);
 
-			FVector TraceStart = MoveBackward(MovedUp, 20, CharacterRotation);
-			FVector TraceEnd =	 MoveForward(MovedUp, 140, CharacterRotation);
+			FVector TraceStart = HelperFunc::MoveBackward(MovedUp, 20, CharacterRotation);
+			FVector TraceEnd =	 HelperFunc::MoveForward(MovedUp, 140, CharacterRotation);
 
 			GetWorld()->SweepSingleByChannel(HitResult, TraceStart, TraceEnd, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(10));
 			UKismetSystemLibrary::DrawDebugLine(this, TraceStart, TraceEnd, FColor::Blue);
 			
 			if (HitResult.bBlockingHit && !HitResult.bStartPenetrating)
 			{
-				UKismetSystemLibrary::DrawDebugSphere(this, HitResult.ImpactPoint, 10, 12, FColor::Cyan);
+				UKismetSystemLibrary::DrawDebugSphere(this, HitResult.ImpactPoint, 10, 12, FColor::Purple);
 				break;
 			}
 		}

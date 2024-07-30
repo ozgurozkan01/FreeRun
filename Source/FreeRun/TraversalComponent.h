@@ -74,48 +74,6 @@ namespace TraversalTypes
 
 using namespace TraversalTypes;
 
-/*
-UENUM(BlueprintType)
-enum class ETraversalTypes : uint8
-{
-	StateFreeRoam			UMETA(DisplayName = "StateFreeRoam"),
-	StateReadyToClimb		UMETA(DisplayName = "StateReadyToClimb"),
-	StateClimb				UMETA(DisplayName = "StateClimb"),
-	StateMantle				UMETA(DisplayName = "StateMantle"),
-	StateVault				UMETA(DisplayName = "StateVault"),
-	NoAction				UMETA(DisplayName = "NoAction"),
-	BracedClimb				UMETA(DisplayName = "BracedClimb"),
-	BracedClimbFallingClimb UMETA(DisplayName = "BracedClimbFallingClimb"),
-	BracedClimbClimbUp		UMETA(DisplayName = "BracedClimbClimbUp"),
-	BracedClimbHopUp		UMETA(DisplayName = "BracedClimbHopUp"),
-	BracedClimbHopLeft		UMETA(DisplayName = "BracedClimbHopLeft"),
-	BracedClimbHopRight		UMETA(DisplayName = "BracedClimbHopRight"),
-	BracedClimbHopLeftUp	UMETA(DisplayName = "BracedClimbHopLeftUp"),
-	BracedClimbHopRightUp	UMETA(DisplayName = "BracedClimbHopRightUp"),
-	BracedClimbHopDown		UMETA(DisplayName = "BracedClimbHopDown"),
-	FreeHang				UMETA(DisplayName = "FreeHang"),
-	FreeHangFallingClimb	UMETA(DisplayName = "FreeHangFallingClimb"),
-	FreeHangClimbUp			UMETA(DisplayName = "FreeHangClimbUp"),
-	FreeHangHopLeft			UMETA(DisplayName = "FreeHangHopLeft"),
-	FreeHangHopRight		UMETA(DisplayName = "FreeHangHopRight"),
-	FreeHangHopDown			UMETA(DisplayName = "FreeHangHopDown"),
-	CornerMove				UMETA(DisplayName = "CornerMove"),
-	Mantle					UMETA(DisplayName = "Mantle"),
-	Vault					UMETA(DisplayName = "Vault"),
-	NoDirection				UMETA(DisplayName = "NoDirection"),
-	DirectionLeft			UMETA(DisplayName = "DirectionLeft"),
-	DirectionRight			UMETA(DisplayName = "DirectionRight"),
-	DirectionForward		UMETA(DisplayName = "DirectionForward"),
-	DirectionBackward		UMETA(DisplayName = "DirectionBackward"),
-	DirectionForwardLeft	UMETA(DisplayName = "DirectionForwardLeft"),
-	DirectionForwardRight	UMETA(DisplayName = "DirectionForwardRight"),
-	DirectionBackwardLeft	UMETA(DisplayName = "DirectionBackwardLeft"),
-	DirectionBackwardRight	UMETA(DisplayName = "DirectionBackwardRight"),
-	ClimbStyleBracedClimb	UMETA(DisplayName = "ClimbStyleBracedClimb"),
-	ClimbStyleFreeHang		UMETA(DisplayName = "ClimbStyleFreeHang"),
-};
-*/
-
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class FREERUN_API UTraversalComponent : public UActorComponent
 {
@@ -138,9 +96,14 @@ public:
 	void SetTraversalState(ETraversalState NewState);
 	void SetTraversalClimbStyle(EClimbStyle NewStyle);
 	void SetTraversalClimbDirection(EClimbDirection NewDirection);
-	float GetClimbStyleValues(EClimbStyle ClimbStyle, float Braced, float Hang);
 	void TriggerTraversalAction(bool bActionTriggered);
+
+	// WALL IMPLEMENTATIONS
+	void GridScanner(int Width, int Height, FVector BaseLocation, FRotator CurrentWorldRotation);
+	
 	FHitResult DetectWall();
+	float GetClimbStyleValues(EClimbStyle ClimbStyle, float Braced, float Hang);
+
 private:
 	UPROPERTY()
 	ACharacter* CharacterRef;
@@ -163,6 +126,17 @@ private:
 	EClimbStyle TraversalClimbStyle;
 	EClimbDirection TraversalClimbDirection;
 	ETraversalAction TraversalAction;
+
+	TArray<FHitResult> WallHitsContainer;
+	TArray<FHitResult> LineHitsContainer;
+
+	FHitResult WallHitResult;
+	FHitResult WallTopResult;
+	FHitResult LastWallTopResult;
+	FHitResult WallDepthResult;
+	FHitResult WallVaultResult;
+	
+	FRotator WallRotation;
 	
 	UPROPERTY(EditDefaultsOnly, meta=(AllowPrivateAccess="true"))
 	TSubclassOf<ADirectionActor> DirectionActorClass;
