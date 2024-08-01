@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "FreeRunCharacter.h"
+#include "FreeRun/Public/Character/FreeRunCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -9,8 +9,8 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-#include "HelperFunctions.h"
-#include "TraversalComponent.h"
+#include "FreeRun/Public/Helper/HelperFunctions.h"
+#include "FreeRun/Public/Components/TraversalComponent.h"
 #include "MotionWarpingComponent.h"
 
 //////////////////////////////////////////////////////////////////////////
@@ -109,6 +109,7 @@ void AFreeRunCharacter::SpaceBarPressed()
 	{
 		FRotator CurrentRotation = HelperFunc::ReverseNormal(DetectedHit.ImpactNormal);
 		TraversalComponent->GridScanner(4, 30, DetectedHit.ImpactPoint, CurrentRotation);
+		TraversalComponent->TriggerTraversalAction(DetectedHit.bBlockingHit);
 	}
 }
 

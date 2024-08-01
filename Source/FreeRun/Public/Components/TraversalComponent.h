@@ -97,9 +97,14 @@ public:
 	void SetTraversalClimbStyle(EClimbStyle NewStyle);
 	void SetTraversalClimbDirection(EClimbDirection NewDirection);
 	void TriggerTraversalAction(bool bActionTriggered);
-
+	void SetTraversalType(bool JumpAction);
+	
 	// WALL IMPLEMENTATIONS
 	void GridScanner(int Width, int Height, FVector BaseLocation, FRotator CurrentWorldRotation);
+	void CalculateWallMeasures();
+	void CalculateWallHeight();
+	void CalculateWallDepth();
+	void CalculateVaultHeight();
 	
 	FHitResult DetectWall();
 	float GetClimbStyleValues(EClimbStyle ClimbStyle, float Braced, float Hang);
@@ -137,6 +142,12 @@ private:
 	FHitResult WallVaultResult;
 	
 	FRotator WallRotation;
+
+	float WallHeight;
+	float WallDepth;
+	float VaultHeight;
+
+	bool bIsInLand;
 	
 	UPROPERTY(EditDefaultsOnly, meta=(AllowPrivateAccess="true"))
 	TSubclassOf<ADirectionActor> DirectionActorClass;

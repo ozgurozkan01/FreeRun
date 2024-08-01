@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "TraversalComponent.h"
+#include "FreeRun/Public/Components/TraversalComponent.h"
 #include "Animation/AnimInstance.h"
 #include "TraversalAnimInstance.generated.h"
 

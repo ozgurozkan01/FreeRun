@@ -1,14 +1,14 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "TraversalComponent.h"
+#include "FreeRun/Public/Components/TraversalComponent.h"
 
-#include "DirectionActor.h"
-#include "TraversalAnimInstance.h"
+#include "FreeRun/Public/Environment/DirectionActor.h"
+#include "FreeRun/Public/AnimInstance/TraversalAnimInstance.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "HelperFunctions.h"
+#include "FreeRun/Public/Helper/HelperFunctions.h"
 #include "AI/NavigationSystemBase.h"
 #include "Kismet/KismetSystemLibrary.h"
 
@@ -16,7 +16,11 @@ UTraversalComponent::UTraversalComponent() :
 	TraversalState(ETraversalState::StateFreeRoam),
 	TraversalClimbStyle(EClimbStyle::ClimbStyleBracedClimb),
 	TraversalClimbDirection(EClimbDirection::NoDirection),
-	TraversalAction(ETraversalAction::NoAction)
+	TraversalAction(ETraversalAction::NoAction),
+	WallHeight(0),
+	WallDepth(0),
+	VaultHeight(0),
+	bIsInLand(true)
 {
 	PrimaryComponentTick.bCanEverTick = false;
 }
@@ -129,6 +133,71 @@ void UTraversalComponent::TriggerTraversalAction(bool bActionTriggered)
 	if (TraversalAction == ETraversalAction::NoAction)
 	{
 		DetectWall();
+		CalculateWallMeasures();
+		SetTraversalType(bActionTriggered);
+	}
+}
+
+void UTraversalComponent::SetTraversalType(bool JumpAction)
+{
+	/* NO ACTION */
+	if (!WallTopResult.bBlockingHit)
+	{
+		if (JumpAction)
+		{
+			CharacterRef->Jump();
+		}
+		return;
+	}
+
+	switch (TraversalState)
+	{
+	case ETraversalState::StateClimb:
+			
+		break;
+	case ETraversalState::StateFreeRoam:
+	{
+		if (bIsInLand)
+		{
+			if (UKismetMathLibrary::InRange_FloatFloat(WallHeight, 90, 160))
+			{
+				if (UKismetMathLibrary::InRange_FloatFloat(WallDepth, 0, 120))
+				{
+					if (UKismetMathLibrary::InRange_FloatFloat(VaultHeight, 60, 120))
+					{
+						if (MovementComponent->Velocity.Length() > 20.f)
+						{
+							GEngine->AddOnScreenDebugMessage(135, 2, FColor::Orange, FString::Printf(TEXT("VAULT")));
+							/* VAULT */
+						}
+						else
+						{
+							GEngine->AddOnScreenDebugMessage(135, 2, FColor::Orange, FString::Printf(TEXT("MANTLE 1")));
+							/* MANTLE */
+						}
+					}
+					else
+					{
+						GEngine->AddOnScreenDebugMessage(135, 2, FColor::Orange, FString::Printf(TEXT("MANTLE 2")));
+						/* MANTLE */
+					}
+				}
+				else
+				{
+					GEngine->AddOnScreenDebugMessage(135, 2, FColor::Orange, FString::Printf(TEXT("MANTLE 3")));
+					/* MANTLE */
+				}
+				break;
+			}
+
+			if (WallHeight < 250.f)
+			{
+				GEngine->AddOnScreenDebugMessage(135, 2, FColor::Orange, FString::Printf(TEXT("CLIMB")));
+				/* CLIMB STATE */
+			}
+		}	
+		break;
+	}
 	}
 }
 
@@ -268,6 +337,53 @@ void UTraversalComponent::GridScanner(int Width, int Height, FVector BaseLocatio
 			}
 		}
 	}
+}
+
+void UTraversalComponent::CalculateWallMeasures()
+{
+	CalculateWallHeight();
+	CalculateWallDepth();
+	CalculateVaultHeight();
+
+	GEngine->AddOnScreenDebugMessage(132, 2, FColor::Orange, FString::Printf(TEXT("Wall Height  : %f"), WallHeight));
+	GEngine->AddOnScreenDebugMessage(133, 2, FColor::Orange, FString::Printf(TEXT("Wall Depth   : %f"), WallDepth));
+	GEngine->AddOnScreenDebugMessage(134, 2, FColor::Orange, FString::Printf(TEXT("Vault Height : %f"), VaultHeight));
+}
+
+void UTraversalComponent::CalculateWallHeight()
+{
+	if (!WallHitResult.bBlockingHit || !WallTopResult.bBlockingHit)
+	{
+		WallHeight = 0;
+		WallDepth = 0;
+		VaultHeight = 0;
+		return;
+	}
+	
+	WallHeight = WallTopResult.ImpactPoint.Z - CharacterRef->GetMesh()->GetSocketLocation("root").Z;
+}
+
+void UTraversalComponent::CalculateWallDepth()
+{
+	if (!WallTopResult.bBlockingHit || !WallDepthResult.bBlockingHit)
+	{
+		WallDepth = 0;
+		return;
+	}
+
+	WallDepth = UKismetMathLibrary::Vector_Distance(WallTopResult.ImpactPoint, WallDepthResult.ImpactPoint);
+}
+
+void UTraversalComponent::CalculateVaultHeight()
+{
+	if (!WallDepthResult.bBlockingHit || !WallVaultResult.bBlockingHit)
+	{
+		VaultHeight = 0;
+		return;
+	}
+
+	VaultHeight = WallDepthResult.ImpactPoint.Z - WallVaultResult.ImpactPoint.Z;
+	
 }
 
 FHitResult UTraversalComponent::DetectWall()

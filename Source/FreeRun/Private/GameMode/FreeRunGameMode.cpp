@@ -1,7 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "FreeRunGameMode.h"
-#include "FreeRunCharacter.h"
+#include "FreeRun/Public/GameMode/FreeRunGameMode.h"
+#include "FreeRun/Public/Character/FreeRunCharacter.h"
 #include "UObject/ConstructorHelpers.h"
 
 AFreeRunGameMode::AFreeRunGameMode()
