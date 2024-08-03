@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "FreeRun/Public/Enums/TraversalEnum.h"
 #include "Components/ActorComponent.h"
 #include "TraversalComponent.generated.h"
 
@@ -13,68 +14,9 @@ class UMotionWarpingComponent;
 class UCameraComponent;
 class UTraversalAnimInstance;
 class ADirectionActor;
+class UTraversalActionData;
 
-namespace TraversalTypes
-{
-	UENUM(BlueprintType)
-	enum class ETraversalState	: uint8
-	{
-		StateFreeRoam			UMETA(DisplayName = "StateFreeRoam"),
-		StateReadyToClimb		UMETA(DisplayName = "StateReadyToClimb"),
-		StateClimb				UMETA(DisplayName = "StateClimb"),
-		StateMantle				UMETA(DisplayName = "StateMantle"),
-		StateVault				UMETA(DisplayName = "StateVault"),
-	};
-
-	UENUM(BlueprintType)
-	enum class ETraversalAction : uint8
-	{
-		NoAction				UMETA(DisplayName = "NoAction"),
-		BracedClimb				UMETA(DisplayName = "BracedClimb"),
-		BracedClimbFallingClimb UMETA(DisplayName = "BracedClimbFallingClimb"),
-		BracedClimbClimbUp		UMETA(DisplayName = "BracedClimbClimbUp"),
-		BracedClimbHopUp		UMETA(DisplayName = "BracedClimbHopUp"),
-		BracedClimbHopLeft		UMETA(DisplayName = "BracedClimbHopLeft"),
-		BracedClimbHopRight		UMETA(DisplayName = "BracedClimbHopRight"),
-		BracedClimbHopLeftUp	UMETA(DisplayName = "BracedClimbHopLeftUp"),
-		BracedClimbHopRightUp	UMETA(DisplayName = "BracedClimbHopRightUp"),
-		BracedClimbHopDown		UMETA(DisplayName = "BracedClimbHopDown"),
-		FreeHang				UMETA(DisplayName = "FreeHang"),
-		FreeHangFallingClimb	UMETA(DisplayName = "FreeHangFallingClimb"),
-		FreeHangClimbUp			UMETA(DisplayName = "FreeHangClimbUp"),
-		FreeHangHopLeft			UMETA(DisplayName = "FreeHangHopLeft"),
-		FreeHangHopRight		UMETA(DisplayName = "FreeHangHopRight"),
-		FreeHangHopDown			UMETA(DisplayName = "FreeHangHopDown"),
-		CornerMove				UMETA(DisplayName = "CornerMove"),
-		Mantle					UMETA(DisplayName = "Mantle"),
-		Vault					UMETA(DisplayName = "Vault"),
-	};
-
-	UENUM(BlueprintType)
-	enum class EClimbDirection		: uint8
-	{
-		NoDirection				UMETA(DisplayName = "NoDirection"),
-		DirectionLeft			UMETA(DisplayName = "DirectionLeft"),
-		DirectionRight			UMETA(DisplayName = "DirectionRight"),
-		DirectionForward		UMETA(DisplayName = "DirectionForward"),
-		DirectionBackward		UMETA(DisplayName = "DirectionBackward"),
-		DirectionForwardLeft	UMETA(DisplayName = "DirectionForwardLeft"),
-		DirectionForwardRight	UMETA(DisplayName = "DirectionForwardRight"),
-		DirectionBackwardLeft	UMETA(DisplayName = "DirectionBackwardLeft"),
-		DirectionBackwardRight	UMETA(DisplayName = "DirectionBackwardRight"),
-	};
-
-	UENUM(BlueprintType)
-	enum class EClimbStyle	: uint8
-	{
-		ClimbStyleBracedClimb	UMETA(DisplayName = "ClimbStyleBracedClimb"),
-		ClimbStyleFreeHang		UMETA(DisplayName = "ClimbStyleFreeHang"),
-	};
-}
-
-using namespace TraversalTypes;
-
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(BlueprintType, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class FREERUN_API UTraversalComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -97,7 +39,13 @@ public:
 	void SetTraversalClimbStyle(EClimbStyle NewStyle);
 	void SetTraversalClimbDirection(EClimbDirection NewDirection);
 	void TriggerTraversalAction(bool bActionTriggered);
-	void SetTraversalType(bool JumpAction);
+	void DecideTraversalType(bool bActionTriggered);
+	void SetTraversalAction(ETraversalAction NewAction);
+	void ClearTraversalDatas();
+	void PlayTraversalMontage(const UTraversalActionData* CurrentActionData);
+
+	void DecideClimbStyle(FVector Location, FRotator Rotation);
+	FVector FindWwarpLocation(FVector Location, FRotator Rotation, float XOffset, float ZOffset) const;
 	
 	// WALL IMPLEMENTATIONS
 	void GridScanner(int Width, int Height, FVector BaseLocation, FRotator CurrentWorldRotation);
@@ -109,27 +57,39 @@ public:
 	FHitResult DetectWall();
 	float GetClimbStyleValues(EClimbStyle ClimbStyle, float Braced, float Hang);
 
+	void ValidateIsInLand();
+	
 private:
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	ACharacter* CharacterRef;
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UCharacterMovementComponent* MovementComponent;
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	USkeletalMeshComponent* CharacterMesh;
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UCapsuleComponent* CapsuleComponent;
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UTraversalAnimInstance* TraversalAnimInstance;
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UMotionWarpingComponent* MotionWarping;
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UCameraComponent* Camera;
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	ADirectionActor* DirectionActor;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	// UTraversalActionData* CurrentActionData;
+	//UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* BracedJumpToClimbData;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* FreeHangJumpToClimb;
 
+	UPROPERTY(VisibleAnywhere)
 	ETraversalState TraversalState;
+	UPROPERTY(VisibleAnywhere)
 	EClimbStyle TraversalClimbStyle;
+	UPROPERTY(VisibleAnywhere)
 	EClimbDirection TraversalClimbDirection;
+	UPROPERTY(VisibleAnywhere)
 	ETraversalAction TraversalAction;
 
 	TArray<FHitResult> WallHitsContainer;
@@ -140,6 +100,7 @@ private:
 	FHitResult LastWallTopResult;
 	FHitResult WallDepthResult;
 	FHitResult WallVaultResult;
+	FHitResult NextClimbHitResult;
 	
 	FRotator WallRotation;
 

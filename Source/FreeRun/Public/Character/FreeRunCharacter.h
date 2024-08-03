@@ -7,6 +7,9 @@
 #include "InputActionValue.h"
 #include "FreeRunCharacter.generated.h"
 
+class UTraversalComponent;
+class UMotionWarpingComponent;
+
 UCLASS(config=Game)
 class AFreeRunCharacter : public ACharacter
 {
@@ -30,17 +33,17 @@ class AFreeRunCharacter : public ACharacter
 
 	/** Move Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	class UInputAction* MoveAction;
+	UInputAction* MoveAction;
 
 	/** Look Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	class UInputAction* LookAction;
+	UInputAction* LookAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	class UTraversalComponent* TraversalComponent;
+	UTraversalComponent* TraversalComp;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Motion, meta = (AllowPrivateAccess = "true"))
-	class UMotionWarpingComponent* MotionWarpingComponent;
+	UMotionWarpingComponent* MotionWarpingComponent;
 public:
 	AFreeRunCharacter();
 

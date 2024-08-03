@@ -50,7 +50,7 @@ AFreeRunCharacter::AFreeRunCharacter()
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
 
-	TraversalComponent = CreateDefaultSubobject<UTraversalComponent>(TEXT("TraversalComponent"));
+	TraversalComp = CreateDefaultSubobject<UTraversalComponent>(TEXT("Traversal Component"));
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 	
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
@@ -70,7 +70,7 @@ void AFreeRunCharacter::BeginPlay()
 		}
 	}
 
-	TraversalComponent->InitializeReferences(this, MotionWarpingComponent, FollowCamera);
+	TraversalComp->InitializeReferences(this, MotionWarpingComponent, FollowCamera);
 }
 //////////////////////////////////////////////////////////////////////////
 // Input
@@ -97,9 +97,9 @@ void AFreeRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 void AFreeRunCharacter::SpaceBarPressed()
 {
-	if (!TraversalComponent) { return; }
+	if (!TraversalComp) { return; }
 
-	FHitResult DetectedHit = TraversalComponent->DetectWall();
+	/*FHitResult DetectedHit = TraversalComp->DetectWall();
 	
 	if (!DetectedHit.bBlockingHit)
 	{
@@ -108,9 +108,10 @@ void AFreeRunCharacter::SpaceBarPressed()
 	else
 	{
 		FRotator CurrentRotation = HelperFunc::ReverseNormal(DetectedHit.ImpactNormal);
-		TraversalComponent->GridScanner(4, 30, DetectedHit.ImpactPoint, CurrentRotation);
-		TraversalComponent->TriggerTraversalAction(DetectedHit.bBlockingHit);
-	}
+		TraversalComp->GridScanner(4, 30, DetectedHit.ImpactPoint, CurrentRotation);
+	}*/
+
+	TraversalComp->TriggerTraversalAction(true);
 }
 
 void AFreeRunCharacter::Move(const FInputActionValue& Value)
