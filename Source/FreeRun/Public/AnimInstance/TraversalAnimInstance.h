@@ -7,7 +7,7 @@
 #include "Animation/AnimInstance.h"
 #include "TraversalAnimInstance.generated.h"
 
-using namespace TraversalTypes;
+class AFreeRunCharacter;
 
 UCLASS()
 class FREERUN_API UTraversalAnimInstance : public UAnimInstance
@@ -16,20 +16,30 @@ class FREERUN_API UTraversalAnimInstance : public UAnimInstance
 
 public:
 
-	UTraversalAnimInstance() :
-	NewTraversalState(ETraversalState::StateFreeRoam),
-	NewTraversalAction(ETraversalAction::NoAction),
-	NewClimbStyle(EClimbStyle::ClimbStyleBracedClimb),
-	NewClimbDirection(EClimbDirection::NoDirection)
-	{}
+	UTraversalAnimInstance()  :
+	TraversalState(ETraversalState::FreeRoam),
+	TraversalAction(ETraversalAction::NoAction),
+	ClimbStyle(EClimbStyle::BracedClimb),
+	ClimbDirection(EClimbDirection::NoDirection)
+	{
+	}
+
+	FORCEINLINE ETraversalState GetTraversalState() const { return TraversalState; }
+	FORCEINLINE ETraversalAction GetTraversalAction() const { return TraversalAction; }
+	FORCEINLINE EClimbStyle GetClimbStyle() const { return ClimbStyle; }
+	FORCEINLINE EClimbDirection GetClimbDirection() const { return ClimbDirection; }
 	
-	FORCEINLINE void SetTraversalState(ETraversalState NewState) { NewTraversalState = NewState; }
-	FORCEINLINE void SetTraversalAction(ETraversalAction NewAction) { NewTraversalAction = NewAction; }
-	FORCEINLINE void SetClimbStyle(EClimbStyle NewStyle) { NewClimbStyle = NewStyle; }
-	FORCEINLINE void SetClimbDirection(EClimbDirection NewDirection) { NewClimbDirection = NewDirection; }
+	FORCEINLINE void SetTraversalState(ETraversalState NewState) { TraversalState = NewState; }
+	FORCEINLINE void SetTraversalAction(ETraversalAction NewAction) { TraversalAction = NewAction; }
+	FORCEINLINE void SetClimbStyle(EClimbStyle NewStyle) { ClimbStyle = NewStyle; }
+	FORCEINLINE void SetClimbDirection(EClimbDirection NewDirection) { ClimbDirection = NewDirection; }
 private:
-	ETraversalState NewTraversalState;
-	ETraversalAction NewTraversalAction;
-	EClimbStyle NewClimbStyle;
-	EClimbDirection NewClimbDirection;
+	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	ETraversalState TraversalState;
+	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	ETraversalAction TraversalAction;
+	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	EClimbStyle ClimbStyle;
+	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	EClimbDirection ClimbDirection;
 };
