@@ -33,6 +33,7 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	void AddMovementInput(float ScaleValue, bool bIsFront);
 	void InitializeReferences(ACharacter* Character, UMotionWarpingComponent* MotionWarpingComponent, UCameraComponent* CameraComponent);
 	void TraversalStateSettings(ECollisionEnabled::Type IsEnabled, EMovementMode NewMovementMode, bool bStopMovementImmediately);
 	void SetTraversalState(ETraversalState NewState);
@@ -43,7 +44,11 @@ public:
 	void SetTraversalAction(ETraversalAction NewAction);
 	void ClearTraversalDatas();
 	void PlayTraversalMontage(const UTraversalActionData* CurrentActionData);
-
+	void ClimbMovement();
+	void StopClimbMovement();
+	void UpdateClimbLocation(FVector Location, FRotator Rotation);
+	
+	bool ClimbSideCheck(FVector ImpactPoint);
 	void DecideClimbStyle(FVector Location, FRotator Rotation);
 	FVector FindWwarpLocation(FVector Location, FRotator Rotation, float XOffset, float ZOffset) const;
 	
@@ -58,7 +63,8 @@ public:
 	float GetClimbStyleValues(EClimbStyle ClimbStyle, float Braced, float Hang);
 
 	void ValidateIsInLand();
-	
+	bool ValidateClimbSurface(FVector ImpactLocation);
+
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	ACharacter* CharacterRef;
@@ -107,7 +113,10 @@ private:
 	float WallHeight;
 	float WallDepth;
 	float VaultHeight;
-
+	float ForwardMovementValue;
+	float RightMovementValue;
+	float ClimbMoveCheckDistance;
+	
 	bool bIsInLand;
 	
 	UPROPERTY(EditDefaultsOnly, meta=(AllowPrivateAccess="true"))

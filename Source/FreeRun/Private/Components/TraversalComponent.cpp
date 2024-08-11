@@ -4,6 +4,7 @@
 #include "FreeRun/Public/Components/TraversalComponent.h"
 
 #include "MotionWarpingComponent.h"
+#include "Components/ArrowComponent.h"
 #include "FreeRun/Public/Environment/DirectionActor.h"
 #include "FreeRun/Public/AnimInstance/TraversalAnimInstance.h"
 #include "Components/CapsuleComponent.h"
@@ -21,6 +22,9 @@ UTraversalComponent::UTraversalComponent() :
 	WallHeight(0),
 	WallDepth(0),
 	VaultHeight(0),
+	ForwardMovementValue(0),
+	RightMovementValue(0),
+	ClimbMoveCheckDistance(10),
 	bIsInLand(true)
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -48,11 +52,43 @@ void UTraversalComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	else
 	{
 		/* In Air */
-		GEngine->AddOnScreenDebugMessage(138, 2, FColor::Orange, FString::Printf(TEXT("In Air")));
 		if (TraversalState == ETraversalState::FreeRoam)
 		{
 			TriggerTraversalAction(false);
 		}
+	}
+}
+
+void UTraversalComponent::AddMovementInput(float ScaleValue, bool bIsFront)
+{
+	bIsFront ? ForwardMovementValue = ScaleValue : RightMovementValue = ScaleValue;
+
+	GEngine->AddOnScreenDebugMessage(-1, 2, FColor::Cyan, FString::Printf(TEXT("RightMovementValue: %f"), RightMovementValue));
+	
+	switch (TraversalState)
+	{
+	case ETraversalState::FreeRoam:
+		if (bIsFront)
+		{
+			FVector ForwardVector = UKismetMathLibrary::GetForwardVector(FRotator(0, CharacterRef->GetControlRotation().Yaw, 0));
+			CharacterRef->AddMovementInput(ForwardVector, ScaleValue);
+		}
+		else
+		{
+			FVector RightVector = UKismetMathLibrary::GetRightVector(FRotator(0, CharacterRef->GetControlRotation().Yaw, CharacterRef->GetControlRotation().Roll));
+			CharacterRef->AddMovementInput(RightVector, ScaleValue);
+		}
+		break;
+	case ETraversalState::Climb:
+		if (TraversalAnimInstance && TraversalAnimInstance->IsAnyMontagePlaying())
+		{
+			StopClimbMovement();
+		}
+		else
+		{
+			ClimbMovement();
+		}
+		break;
 	}
 }
 
@@ -100,7 +136,7 @@ void UTraversalComponent::SetTraversalState(ETraversalState NewState)
 	if (TraversalState != NewState)
 	{
 		TraversalState = NewState;
-		// TraversalAnimInstance->SetTraversalState(NewState);
+		TraversalAnimInstance->SetTraversalState(NewState);
 
 		switch (TraversalState)
 		{
@@ -180,6 +216,23 @@ void UTraversalComponent::ValidateIsInLand()
 	}
 }
 
+bool UTraversalComponent::ValidateClimbSurface(FVector ImpactLocation)
+{
+	FRotator ArrowComRotation = DirectionActor->ArrowComponent->GetComponentRotation();
+	FVector MovedRight = HelperFunc::MoveRight(ImpactLocation, RightMovementValue * 13, ArrowComRotation);
+	FVector MovedDown = HelperFunc::MoveDown(MovedRight, 90);
+
+	FVector TraceStart = HelperFunc::MoveBackward(MovedDown, 40, CharacterRef->GetActorRotation());
+	FVector TraceEnd = HelperFunc::MoveBackward(MovedDown, 25, CharacterRef->GetActorRotation());
+
+	TArray<AActor*> ActorsToIgnore;
+	FHitResult SurfaceHit;
+	
+	bool bCanClimbMode = UKismetSystemLibrary::CapsuleTraceSingle(this, TraceStart, TraceEnd, 5, 82, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, SurfaceHit, true);
+
+	return !bCanClimbMode;
+}
+
 void UTraversalComponent::ClearTraversalDatas()
 {
 	WallHitResult.Reset();
@@ -209,6 +262,152 @@ void UTraversalComponent::PlayTraversalMontage(const UTraversalActionData* Curre
 		SetTraversalState(CurrentActionData->OutState);
 		SetTraversalAction(ETraversalAction::NoAction);
 	}
+}
+
+void UTraversalComponent::ClimbMovement()
+{
+	FHitResult ClimbWallHitResult;
+	FHitResult ClimbTopHitResult;
+	
+	if (TraversalAction != ETraversalAction::CornerMove)
+	{
+		if (!(UKismetMathLibrary::Abs(RightMovementValue) > 0.7))
+		{
+			StopClimbMovement();
+		}
+		else
+		{
+			RightMovementValue > 0 ? SetTraversalClimbDirection(EClimbDirection::Right) : SetTraversalClimbDirection(EClimbDirection::Left);
+
+			if (DirectionActor)
+			{
+				for (int i = 0; i < 3; i++)
+				{
+					int Index = i;
+
+					FVector DirectionLocation = DirectionActor->ArrowComponent->GetComponentLocation();
+					FRotator DirectionRotation = DirectionActor->ArrowComponent->GetComponentRotation();
+					
+					FVector MoveRight = HelperFunc::MoveRight(DirectionLocation, ClimbMoveCheckDistance * RightMovementValue, DirectionRotation);
+					FVector TraceStart = HelperFunc::MoveDown(MoveRight, i * 10);
+					FVector TraceEnd = HelperFunc::MoveForward(TraceStart, 60, DirectionRotation);
+
+					TArray<AActor*> ActorsToIgnore;
+					UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbWallHitResult, true, FLinearColor::Black, FLinearColor::Blue, 20);
+
+					if (!ClimbWallHitResult.bStartPenetrating)
+					{
+						if (ClimbWallHitResult.bBlockingHit)
+						{
+							WallRotation = HelperFunc::ReverseNormal(ClimbWallHitResult.ImpactNormal);
+							
+							for (int j = 0; j < 7; j++)
+							{
+								FVector MovedForward = HelperFunc::MoveForward(ClimbWallHitResult.ImpactPoint, 2, WallRotation);
+								FVector MovedUp = HelperFunc::MoveUp(MovedForward, 5);
+								FVector Start = HelperFunc::MoveUp(MovedUp, j * 5);
+								FVector End = HelperFunc::MoveDown(Start, 100);
+
+								UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 2.5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbTopHitResult, true, FLinearColor::Red, FLinearColor::Green, 20);
+
+								if (ClimbTopHitResult.bStartPenetrating)
+								{
+									if (Index == 2 && j == 6)
+									{
+										StopClimbMovement();
+									}
+								}
+								else
+								{
+									if (!ClimbTopHitResult.bBlockingHit)
+									{
+										StopClimbMovement();
+									}
+									else
+									{
+										if (!ClimbSideCheck(ClimbTopHitResult.ImpactPoint))
+										{
+											// DrawDebugSphere(GetWorld(), ClimbWallHitResult.ImpactPoint, 12, 12, FColor::Black);
+											if (!ValidateClimbSurface(ClimbWallHitResult.ImpactPoint))
+											{
+												StopClimbMovement();
+											}
+											else
+											{
+												FVector MovedBackward = HelperFunc::MoveBackward(ClimbWallHitResult.ImpactPoint, GetClimbStyleValues(TraversalClimbStyle, 35, 7), WallRotation);
+												FVector InputLocation{MovedBackward.X, MovedBackward.Y, ClimbTopHitResult.ImpactPoint.Z};
+												UpdateClimbLocation(InputLocation, WallRotation);
+												DecideClimbStyle(ClimbTopHitResult.ImpactPoint, WallRotation);
+											}
+										}
+										return; // Break the outter loop.
+									}
+									break;
+								}
+							}
+						}
+						else
+						{
+							if (Index != 2)
+							{
+								StopClimbMovement();
+							}
+						}
+					}
+				}	
+			}
+		}
+	}
+}
+
+void UTraversalComponent::StopClimbMovement()
+{
+	if (MovementComponent)
+	{
+		MovementComponent->StopMovementImmediately();
+		SetTraversalClimbDirection(EClimbDirection::NoDirection);
+	}
+}
+
+void UTraversalComponent::UpdateClimbLocation(FVector Location, FRotator Rotation)
+{
+	FVector CharacterLocation = CharacterRef->GetActorLocation();
+	float DeltaSeconds = GetWorld()->GetDeltaSeconds();
+	float InterpSpeed = 2.f;
+	
+	float X = FMath::FInterpTo(CharacterLocation.X, Location.X, DeltaSeconds, InterpSpeed); // X
+	float Y = FMath::FInterpTo(CharacterLocation.Y, Location.Y, DeltaSeconds, InterpSpeed); // Y
+	float Z = FMath::FInterpTo(CharacterLocation.Z, Location.Z - GetClimbStyleValues(TraversalClimbStyle, 107.f, 115.f), DeltaSeconds, GetClimbStyleValues(TraversalClimbStyle, 2.7, 1.8)); // Z
+
+	CharacterRef->SetActorLocationAndRotation(FVector(X,Y,Z), Rotation);
+}
+
+bool UTraversalComponent::ClimbSideCheck(FVector ImpactPoint)
+{
+	FVector MovedUp = HelperFunc::MoveUp(ImpactPoint, 2);
+	
+	for (int i = 0; i < 6; i++)
+	{
+		FVector TraceStart = HelperFunc::MoveUp(MovedUp, i * 5);
+		FVector TraceEnd = HelperFunc::MoveRight(TraceStart, RightMovementValue * 15, WallRotation);
+		FHitResult ClimbRightResult;
+		TArray<AActor*> ActorsToIgnore;
+		
+		bool bRightHit = UKismetSystemLibrary::LineTraceSingle(this, TraceStart, TraceEnd, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbRightResult, true, FLinearColor::Black, FLinearColor::Blue);
+
+		if (bRightHit && i == 5)
+		{
+			StopClimbMovement();
+			return true;
+		}
+
+		if (!bRightHit)
+		{
+			return false;
+		}
+	}
+
+	return false;
 }
 
 void UTraversalComponent::DecideClimbStyle(FVector Location, FRotator Rotation)
