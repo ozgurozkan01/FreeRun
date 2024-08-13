@@ -87,7 +87,7 @@ void AFreeRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 		//Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AFreeRunCharacter::Move);
-
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &AFreeRunCharacter::StopMove);
 		//Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AFreeRunCharacter::Look);
 
@@ -119,9 +119,9 @@ void AFreeRunCharacter::Move(const FInputActionValue& Value)
 	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
 
-	if (Controller != nullptr && TraversalComp)
+	if (MovementVector.Length() != 0 && Controller != nullptr && TraversalComp)
 	{
-		// find out which way is forward
+		/*// find out which way is forward
 		const FRotator Rotation = Controller->GetControlRotation();
 		const FRotator YawRotation(0, Rotation.Yaw, 0);
 
@@ -131,13 +131,19 @@ void AFreeRunCharacter::Move(const FInputActionValue& Value)
 		// get right vector 
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-		/*// add movement 
+		// add movement 
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 		AddMovementInput(RightDirection, MovementVector.X);*/
 
 		TraversalComp->AddMovementInput(MovementVector.Y, true);
 		TraversalComp->AddMovementInput(MovementVector.X, false);
 	}
+}
+
+void AFreeRunCharacter::StopMove(const FInputActionValue& Value)
+{
+	GEngine->AddOnScreenDebugMessage(131231236, 2, FColor::Orange, FString::Printf(TEXT("CLEAR MOVE DATAS")));
+	TraversalComp->ClearMovementDatas();
 }
 
 void AFreeRunCharacter::Look(const FInputActionValue& Value)
