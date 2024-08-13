@@ -20,7 +20,11 @@ public:
 	TraversalState(ETraversalState::FreeRoam),
 	TraversalAction(ETraversalAction::NoAction),
 	ClimbStyle(EClimbStyle::BracedClimb),
-	ClimbDirection(EClimbDirection::NoDirection)
+	ClimbDirection(EClimbDirection::NoDirection),
+	LeftHandClimbLocation(0),
+	RightHandClimbLocation(0),
+	LeftHandClimbRotation(0),
+	RightHandClimbRotation(0)
 	{
 	}
 
@@ -33,6 +37,16 @@ public:
 	FORCEINLINE void SetTraversalAction(ETraversalAction NewAction) { TraversalAction = NewAction; }
 	FORCEINLINE void SetClimbStyle(EClimbStyle NewStyle) { ClimbStyle = NewStyle; }
 	FORCEINLINE void SetClimbDirection(EClimbDirection NewDirection) { ClimbDirection = NewDirection; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetLeftHandClimbLocation(const FVector NewLocation);
+	UFUNCTION(BlueprintCallable)
+	void SetRightHandClimbLocation(const FVector NewLocation);
+	UFUNCTION(BlueprintCallable)
+	void SetLeftHandClimbRotation(const FRotator NewRotation);
+	UFUNCTION(BlueprintCallable)
+	void SetRightHandClimbRotation(const FRotator NewRotation);
+	
 private:
 	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
 	ETraversalState TraversalState;
@@ -42,4 +56,14 @@ private:
 	EClimbStyle ClimbStyle;
 	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
 	EClimbDirection ClimbDirection;
+
+	/* Be used to change hand location and rotation of hand as dynamically */
+	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	FVector LeftHandClimbLocation;
+	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	FVector RightHandClimbLocation;
+	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	FRotator LeftHandClimbRotation;
+	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	FRotator RightHandClimbRotation;
 };
