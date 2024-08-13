@@ -43,6 +43,7 @@ public:
 	void DecideTraversalType(bool bActionTriggered);
 	void SetTraversalAction(ETraversalAction NewAction);
 	void ClearTraversalDatas();
+	void ClearMovementDatas();
 	void PlayTraversalMontage(const UTraversalActionData* CurrentActionData);
 	void ClimbMovement();
 	void StopClimbMovement();
@@ -58,6 +59,7 @@ public:
 	void CalculateWallHeight();
 	void CalculateWallDepth();
 	void CalculateVaultHeight();
+	void CalculateNextHandClimbLocationIK(const bool bLeftHand);
 	
 	FHitResult DetectWall();
 	float GetClimbStyleValues(EClimbStyle ClimbStyle, float Braced, float Hang);
