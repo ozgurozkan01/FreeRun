@@ -15,13 +15,13 @@ namespace HelperFunc
 
 	inline FVector MoveRight(FVector Source, float RightValue, FRotator Rotator)
 	{
-		FVector RightVector = Rotator.Vector().RightVector;
+		FVector RightVector = UKismetMathLibrary::GetRightVector(Rotator);
 		return Source + (RightVector * RightValue);
 	}
 
 	inline FVector MoveLeft(FVector Source, float LeftValue, FRotator Rotator)
 	{
-		FVector LeftVector = -Rotator.Vector().RightVector;
+		FVector LeftVector = -UKismetMathLibrary::GetRightVector(Rotator);
 		return Source + (LeftVector * LeftValue);
 	}
 	
