@@ -39,6 +39,7 @@ void UTraversalComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	/*
 	// Get the current location and rotation of DirectionActor
 	FVector StartLocation = DirectionActor->ArrowComponent->GetComponentLocation();
 	FRotator CurrentRotation = DirectionActor->ArrowComponent->GetComponentRotation();
@@ -49,13 +50,14 @@ void UTraversalComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 
 	// Draw the debug line with the updated direction
 	DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Orange, false, -1, 0, 1.0f);
+	*/
 
-	if (GEngine)
+	/*if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(654, -1, FColor::Emerald, FString::Printf(TEXT("%f, %f, %f"), DirectionActor->ArrowComponent->GetComponentRotation().Pitch,
 			DirectionActor->ArrowComponent->GetComponentRotation().Yaw,
 			DirectionActor->ArrowComponent->GetComponentRotation().Roll));
-	}
+	}*/
 	
 	ValidateIsInLand();
 
@@ -75,6 +77,12 @@ void UTraversalComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 			TriggerTraversalAction(false);
 		}
 	}
+}
+
+void UTraversalComponent::OnMontageBlendOut(UAnimMontage* Montage, bool bInterrupted)
+{
+	SetTraversalState(CurrentActionDataRef->OutState);
+	SetTraversalAction(ETraversalAction::NoAction);
 }
 
 void UTraversalComponent::AddMovementInput(float ScaleValue, bool bIsFront)
@@ -130,6 +138,11 @@ void UTraversalComponent::InitializeReferences(ACharacter* Character, UMotionWar
 		DirectionActor->AttachToComponent(CharacterMesh, FAttachmentTransformRules::SnapToTargetIncludingScale);
 		DirectionActor->SetActorRelativeLocation(FVector(0, 0, 195.f));
 		DirectionActor->SetActorRelativeRotation(FRotator(0, 90, 0));
+	}
+
+	if (TraversalAnimInstance)
+	{
+		TraversalAnimInstance->OnMontageBlendingOut.AddDynamic(this, &UTraversalComponent::OnMontageBlendOut);
 	}
 }
 
@@ -288,8 +301,7 @@ void UTraversalComponent::PlayTraversalMontage(const UTraversalActionData* Curre
 
 		TraversalAnimInstance->Montage_Play(CurrentActionData->ActionMontage);
 
-		SetTraversalState(CurrentActionData->OutState);
-		SetTraversalAction(ETraversalAction::NoAction);
+		TraversalAnimInstance->Montage_GetBlendingOutDelegate(CurrentActionData->ActionMontage);
 	}
 }
 
@@ -608,14 +620,14 @@ void UTraversalComponent::SetTraversalAction(ETraversalAction NewAction)
 		case ETraversalAction::BracedClimb: 
 			if (BracedJumpToClimbData)
 			{
-				// CurrentActionData = BracedJumpToClimbData;
+				CurrentActionDataRef = BracedJumpToClimbData;
 				PlayTraversalMontage(BracedJumpToClimbData);
 			}
 			break;
 		case ETraversalAction::FreeHang:
 			if (FreeHangJumpToClimb)
 			{
-				// CurrentActionData = FreeHangJumpToClimb;
+				CurrentActionDataRef = FreeHangJumpToClimb;
 				PlayTraversalMontage(FreeHangJumpToClimb);
 			}
 			break;
@@ -824,12 +836,11 @@ void UTraversalComponent::CalculateVaultHeight()
 
 void UTraversalComponent::CalculateNextHandClimbLocationIK(const bool bLeftHand)
 {
-
 	FHitResult ClimbWallHitResult;
 	FHitResult ClimbTopHitResult;
 	FRotator ClimbHandRotation;
 	FVector ClimbHandLocation;
-	
+
 	if (TraversalState == ETraversalState::ReadyToClimb)
 	{
 		if (NextClimbHitResult.bBlockingHit)
@@ -851,7 +862,7 @@ void UTraversalComponent::CalculateNextHandClimbLocationIK(const bool bLeftHand)
 				if (ClimbWallHitResult.bBlockingHit)
 				{
 					WallRotation = HelperFunc::ReverseNormal(ClimbWallHitResult.ImpactNormal);
-					FRotator AddRotation = bLeftHand ? FRotator(90, 0, 280) : FRotator(270, 0, 270);
+					FRotator AddRotation = bLeftHand ? FRotator(90, 0, 200) : FRotator(270, 90, 270);
 					ClimbHandRotation = WallRotation + AddRotation;
 
 					for (int j = 0; j < 6; j++)

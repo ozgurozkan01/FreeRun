@@ -29,7 +29,11 @@ protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
-public:	
+public:
+
+	UFUNCTION()
+	void OnMontageBlendOut(UAnimMontage* Montage, bool bInterrupted);
+
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
@@ -59,6 +63,7 @@ public:
 	void CalculateWallHeight();
 	void CalculateWallDepth();
 	void CalculateVaultHeight();
+	UFUNCTION(BlueprintCallable)
 	void CalculateNextHandClimbLocationIK(const bool bLeftHand);
 	
 	FHitResult DetectWall();
@@ -90,7 +95,9 @@ private:
 	UTraversalActionData* BracedJumpToClimbData;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UTraversalActionData* FreeHangJumpToClimb;
-
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* CurrentActionDataRef;
+	
 	UPROPERTY(VisibleAnywhere)
 	ETraversalState TraversalState;
 	UPROPERTY(VisibleAnywhere)
