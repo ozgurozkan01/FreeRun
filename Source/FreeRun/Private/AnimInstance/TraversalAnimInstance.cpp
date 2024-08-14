@@ -5,13 +5,13 @@
 
 void UTraversalAnimInstance::SetLeftHandClimbLocation(const FVector NewLocation)
 {
-	float InterpSpeed = TraversalState == ETraversalState::Climb ? 15.f : 1.f;
+	float InterpSpeed = TraversalState == ETraversalState::Climb ? 15.f : 500.f;
 	LeftHandClimbLocation = FMath::VInterpTo(LeftHandClimbLocation, NewLocation, GetWorld()->GetDeltaSeconds(), InterpSpeed);
 }
 
 void UTraversalAnimInstance::SetRightHandClimbLocation(const FVector NewLocation)
 {
-	float InterpSpeed = TraversalState == ETraversalState::Climb ? 15.f : 1.f;
+	float InterpSpeed = TraversalState == ETraversalState::Climb ? 15.f : 500.f;
 	RightHandClimbLocation = FMath::VInterpTo(RightHandClimbLocation, NewLocation, GetWorld()->GetDeltaSeconds(), InterpSpeed);
 }
 
