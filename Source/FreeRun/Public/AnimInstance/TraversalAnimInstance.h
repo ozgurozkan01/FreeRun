@@ -46,7 +46,10 @@ public:
 	void SetLeftHandClimbRotation(const FRotator NewRotation);
 	UFUNCTION(BlueprintCallable)
 	void SetRightHandClimbRotation(const FRotator NewRotation);
-	
+	UFUNCTION(BlueprintCallable)
+	void SetRightFootLocation(const FVector NewLocation);
+	UFUNCTION(BlueprintCallable)
+	void SetLeftFootLocation(const FVector NewLocation);
 private:
 	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
 	ETraversalState TraversalState;
@@ -66,4 +69,8 @@ private:
 	FRotator LeftHandClimbRotation;
 	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
 	FRotator RightHandClimbRotation;
+	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	FVector LeftFootClimbLocation;
+	UPROPERTY(BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	FVector RightFootClimbLocation;
 };

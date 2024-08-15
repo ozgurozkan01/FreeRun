@@ -53,9 +53,19 @@ public:
 	void StopClimbMovement();
 	void UpdateClimbLocation(FVector Location, FRotator Rotation);
 	
+	// IK SECTION
+	void ClimbMovementIK();
+	UFUNCTION(BlueprintCallable)
+	void CalculateNextHandClimbLocationIK(const bool bLeftHand);
+	UFUNCTION(BlueprintCallable)
+	void CalculateNextLegClimbLocationIK(const bool bLeftLeg);
+	void UpdateHandLocationIK(const bool bLeftHand);
+	void UpdateLegLocationIK(const bool bLeftLeg);
+	void ResetFootIK();
+	
 	bool ClimbSideCheck(FVector ImpactPoint);
 	void DecideClimbStyle(FVector Location, FRotator Rotation);
-	FVector FindWwarpLocation(FVector Location, FRotator Rotation, float XOffset, float ZOffset) const;
+	FVector FindWarpLocation(FVector Location, FRotator Rotation, float XOffset, float ZOffset) const;
 	
 	// WALL IMPLEMENTATIONS
 	void GridScanner(int Width, int Height, FVector BaseLocation, FRotator CurrentWorldRotation);
@@ -63,9 +73,8 @@ public:
 	void CalculateWallHeight();
 	void CalculateWallDepth();
 	void CalculateVaultHeight();
-	UFUNCTION(BlueprintCallable)
-	void CalculateNextHandClimbLocationIK(const bool bLeftHand);
-	
+
+
 	FHitResult DetectWall();
 	float GetClimbStyleValues(EClimbStyle ClimbStyle, float Braced, float Hang);
 
@@ -125,6 +134,7 @@ private:
 	float ForwardMovementValue;
 	float RightMovementValue;
 	float ClimbMoveCheckDistance;
+	float ClimbHandSpace;
 	
 	bool bIsInLand;
 	

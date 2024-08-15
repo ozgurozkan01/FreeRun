@@ -25,6 +25,7 @@ UTraversalComponent::UTraversalComponent() :
 	ForwardMovementValue(0),
 	RightMovementValue(0),
 	ClimbMoveCheckDistance(10),
+	ClimbHandSpace(20),
 	bIsInLand(true)
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -61,22 +62,17 @@ void UTraversalComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	
 	ValidateIsInLand();
 
-	if (bIsInLand)
+	if (bIsInLand && TraversalAction == ETraversalAction::NoAction)
 	{
-		if (TraversalAction == ETraversalAction::NoAction)
-		{
-			ClearTraversalDatas();
-		}
+		ClearTraversalDatas();
 	}
 
-	else
+	else if (!bIsInLand && TraversalState == ETraversalState::FreeRoam)
 	{
-		/* In Air */
-		if (TraversalState == ETraversalState::FreeRoam)
-		{
-			TriggerTraversalAction(false);
-		}
+		TriggerTraversalAction(false);
 	}
+
+	ClimbMovementIK();
 }
 
 void UTraversalComponent::OnMontageBlendOut(UAnimMontage* Montage, bool bInterrupted)
@@ -293,14 +289,13 @@ void UTraversalComponent::PlayTraversalMontage(const UTraversalActionData* Curre
 	{
 		SetTraversalState(CurrentActionData->InState);
 
-		FVector TopLocation = FindWwarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionData->Warp1XOffset, CurrentActionData->Warp1ZOffset);
+		FVector TopLocation = FindWarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionData->Warp1XOffset, CurrentActionData->Warp1ZOffset);
 		MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(FName("TopResultWarp"), TopLocation, WallRotation);
 
-		FVector BalanceLocation = FindWwarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionData->Warp2XOffset, CurrentActionData->Warp2ZOffset);
+		FVector BalanceLocation = FindWarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionData->Warp2XOffset, CurrentActionData->Warp2ZOffset);
 		MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(FName("BalanceWarp"), BalanceLocation, WallRotation);
 
 		TraversalAnimInstance->Montage_Play(CurrentActionData->ActionMontage);
-
 		TraversalAnimInstance->Montage_GetBlendingOutDelegate(CurrentActionData->ActionMontage);
 	}
 }
@@ -349,7 +344,7 @@ void UTraversalComponent::ClimbMovement()
 
 						if (ClimbWallHitResult.bBlockingHit)
 						{
-							DrawDebugSphere(GetWorld(), ClimbWallHitResult.ImpactPoint, 3, 12, FColor::Purple, false, 2);
+							// DrawDebugSphere(GetWorld(), ClimbWallHitResult.ImpactPoint, 3, 12, FColor::Purple, false, 2);
 							GEngine->AddOnScreenDebugMessage(138, 2, FColor::Orange, FString::Printf(TEXT("Stop Climb Movement l")));
 							WallRotation = HelperFunc::ReverseNormal(ClimbWallHitResult.ImpactNormal);
 
@@ -385,12 +380,10 @@ void UTraversalComponent::ClimbMovement()
 											// DrawDebugSphere(GetWorld(), ClimbWallHitResult.ImpactPoint, 12, 12, FColor::Black);
 											if (!ValidateClimbSurface(ClimbWallHitResult.ImpactPoint))
 											{
-												GEngine->AddOnScreenDebugMessage(141, 2, FColor::Orange, FString::Printf(TEXT("Stop Climb Movement")));
 												StopClimbMovement();
 											}
 											else
 											{
-												GEngine->AddOnScreenDebugMessage(142, 2, FColor::Orange, FString::Printf(TEXT("Climb Movement")));
 												FVector MovedBackward = HelperFunc::MoveBackward(ClimbWallHitResult.ImpactPoint, GetClimbStyleValues(TraversalClimbStyle, 35, 7), WallRotation);
 												FVector InputLocation{MovedBackward.X, MovedBackward.Y, ClimbTopHitResult.ImpactPoint.Z};
 												
@@ -429,7 +422,7 @@ void UTraversalComponent::StopClimbMovement()
 
 void UTraversalComponent::UpdateClimbLocation(FVector Location, FRotator Rotation)
 {
-	UKismetSystemLibrary::DrawDebugSphere(this, Location, 2, 12, FColor::Cyan);
+	// UKismetSystemLibrary::DrawDebugSphere(this, Location, 2, 12, FColor::Cyan);
 
 	FVector CharacterLocation = CharacterRef->GetActorLocation();
 	float DeltaSeconds = GetWorld()->GetDeltaSeconds();
@@ -437,11 +430,23 @@ void UTraversalComponent::UpdateClimbLocation(FVector Location, FRotator Rotatio
 	
 	float X = FMath::FInterpTo(CharacterLocation.X, Location.X, DeltaSeconds, InterpSpeed); // X
 	float Y = FMath::FInterpTo(CharacterLocation.Y, Location.Y, DeltaSeconds, InterpSpeed); // Y
-	float Z = FMath::FInterpTo(CharacterLocation.Z, Location.Z - GetClimbStyleValues(TraversalClimbStyle, 107.f, 115.f), DeltaSeconds, GetClimbStyleValues(TraversalClimbStyle, 2.7, 1.8)); // Z
+	float Z = FMath::FInterpTo(CharacterLocation.Z, Location.Z - GetClimbStyleValues(TraversalClimbStyle, 107.f, 115.f), DeltaSeconds, GetClimbStyleValues(TraversalClimbStyle, 20, 10)); // Z
 
 	FVector NewLocation(X,Y,Z);
 	
 	CharacterRef->SetActorLocationAndRotation(NewLocation, Rotation);
+}
+
+void UTraversalComponent::ClimbMovementIK()
+{
+	if (TraversalState == ETraversalState::Climb)
+	{
+		UpdateHandLocationIK(true);
+		UpdateHandLocationIK(false);
+		
+		UpdateLegLocationIK(true);
+		UpdateLegLocationIK(false);
+	}
 }
 
 bool UTraversalComponent::ClimbSideCheck(FVector ImpactPoint)
@@ -493,7 +498,7 @@ void UTraversalComponent::DecideClimbStyle(FVector Location, FRotator Rotation)
 	}
 }
 
-FVector UTraversalComponent::FindWwarpLocation(FVector Location, FRotator Rotation, float XOffset, float ZOffset) const
+FVector UTraversalComponent::FindWarpLocation(FVector Location, FRotator Rotation, float XOffset, float ZOffset) const
 {
 	FVector Forward = HelperFunc::MoveForward(Location, XOffset, Rotation);
 	
@@ -840,7 +845,7 @@ void UTraversalComponent::CalculateNextHandClimbLocationIK(const bool bLeftHand)
 	FHitResult ClimbTopHitResult;
 	FRotator ClimbHandRotation;
 	FVector ClimbHandLocation;
-
+	
 	if (TraversalState == ETraversalState::ReadyToClimb)
 	{
 		if (NextClimbHitResult.bBlockingHit)
@@ -857,13 +862,13 @@ void UTraversalComponent::CalculateNextHandClimbLocationIK(const bool bLeftHand)
 
 				TArray<AActor*> ActorsToIgnore;
 				
-				UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 5,  TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbWallHitResult, true);
+				UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 5,  TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, ClimbWallHitResult, true);
 
 				if (ClimbWallHitResult.bBlockingHit)
 				{
 					WallRotation = HelperFunc::ReverseNormal(ClimbWallHitResult.ImpactNormal);
 					FRotator AddRotation = bLeftHand ? FRotator(90, 0, 200) : FRotator(270, 90, 270);
-					ClimbHandRotation = WallRotation + AddRotation;
+					ClimbHandRotation = WallRotation + AddRotation - DirectionActor->ArrowComponent->GetComponentRotation();
 
 					for (int j = 0; j < 6; j++)
 					{
@@ -873,7 +878,7 @@ void UTraversalComponent::CalculateNextHandClimbLocationIK(const bool bLeftHand)
 
 						TArray<AActor*> ActorsToIgnore2;
 						
-						UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 5,  TraceTypeQuery1, false, ActorsToIgnore2, EDrawDebugTrace::ForOneFrame, ClimbTopHitResult, true);
+						UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 5,  TraceTypeQuery1, false, ActorsToIgnore2, EDrawDebugTrace::None, ClimbTopHitResult, true);
 
 						if (ClimbTopHitResult.bBlockingHit && !ClimbTopHitResult.bStartPenetrating)
 						{
@@ -896,6 +901,158 @@ void UTraversalComponent::CalculateNextHandClimbLocationIK(const bool bLeftHand)
 				}
 			}
 		}
+	}
+}
+
+void UTraversalComponent::CalculateNextLegClimbLocationIK(const bool bLeftLeg)
+{
+	if (TraversalClimbStyle == EClimbStyle::BracedClimb)
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			FVector MovedUp = HelperFunc::MoveUp(NextClimbHitResult.ImpactPoint, i * 5);
+
+			FVector LegPosition = bLeftLeg ? HelperFunc::MoveLeft(MovedUp, 7, WallRotation) : HelperFunc::MoveRight(MovedUp, 9, WallRotation);
+
+			float DownValue = bLeftLeg ? 150: 140;
+			FVector MovedDown = HelperFunc::MoveDown(LegPosition, DownValue);
+
+			FVector TraceStart = HelperFunc::MoveBackward(MovedDown, 30, WallRotation);
+			FVector TraceEnd = HelperFunc::MoveForward(MovedDown, 30, WallRotation);
+
+			TArray<AActor*> ActorsToIgnore;
+			FHitResult HitResult;
+			
+			bool bIsHit = UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 6, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, HitResult, true);
+
+			if (bIsHit && TraversalAnimInstance)
+			{
+				FVector NewLocation = HelperFunc::MoveBackward(HitResult.ImpactPoint, 17, HelperFunc::ReverseNormal(HitResult.ImpactNormal));
+				bLeftLeg ? TraversalAnimInstance->SetLeftFootLocation(NewLocation) : TraversalAnimInstance->SetRightFootLocation(NewLocation);
+				break;
+			}
+		}
+	}
+}
+
+void UTraversalComponent::UpdateHandLocationIK(const bool bLeftHand)
+{
+	if (CharacterMesh == nullptr || CharacterRef == nullptr) { return; }
+
+	if (TraversalState == ETraversalState::Climb)
+	{
+		for (int i = 0; i < 9; i++)
+		{
+			FName SocketName = bLeftHand ? FName("ik_hand_l") : FName("ik_hand_r");
+			FVector HandSocketLocation = CharacterMesh->GetSocketLocation(FName(SocketName));
+
+			FVector TracingRepresenter = bLeftHand ? HelperFunc::MoveRight(HandSocketLocation, i * 2 + ClimbHandSpace, CharacterRef->GetActorRotation()) :
+												  HelperFunc::MoveLeft(HandSocketLocation, i * 2 + ClimbHandSpace, CharacterRef->GetActorRotation());
+
+			FVector TraceStart = HelperFunc::MoveBackward(TracingRepresenter, 50, CharacterRef->GetActorRotation());
+			FVector TraceEnd = HelperFunc::MoveForward(TracingRepresenter, 70, CharacterRef->GetActorRotation());
+
+			TArray<AActor*> ActorsToIgnore;
+			FHitResult ClimbWallHitResult;
+			
+			UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 15, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, ClimbWallHitResult, true);
+
+			if (ClimbWallHitResult.bBlockingHit && !ClimbWallHitResult.bStartPenetrating)
+			{
+				WallRotation = HelperFunc::ReverseNormal(ClimbWallHitResult.ImpactNormal);
+				FRotator AddRotation = bLeftHand ? FRotator(90, 0, 200) : FRotator(270, 90, 270);
+				FRotator ClimbHandRotation = WallRotation + AddRotation - DirectionActor->ArrowComponent->GetComponentRotation();
+
+				for (int j = 0; j < 9; j++)
+				{
+					FVector MovedForward = HelperFunc::MoveForward(ClimbWallHitResult.ImpactPoint, 2, WallRotation);
+					FVector Start = HelperFunc::MoveUp(MovedForward, j * 5);
+					FVector End = HelperFunc::MoveDown(Start, 75);
+
+					TArray<AActor*> ActorsToIgnore2;
+					FHitResult ClimbTopHitResult;
+					
+					UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 2.5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, ClimbTopHitResult, true);
+
+					if (ClimbTopHitResult.bBlockingHit && !ClimbTopHitResult.bStartPenetrating)
+					{
+						FVector MovedDown2 = HelperFunc::MoveDown(ClimbTopHitResult.ImpactPoint, 9);
+						FVector ClimbHandLocation(ClimbWallHitResult.ImpactPoint.X, ClimbWallHitResult.ImpactPoint.Y, MovedDown2.Z);
+
+						if (bLeftHand)
+						{
+							TraversalAnimInstance->SetLeftHandClimbLocation(ClimbHandLocation);
+							TraversalAnimInstance->SetLeftHandClimbRotation(ClimbHandRotation);
+						}
+						else
+						{
+							TraversalAnimInstance->SetRightHandClimbLocation(ClimbHandLocation);
+							TraversalAnimInstance->SetRightHandClimbRotation(ClimbHandRotation);
+						}
+						break;
+					}
+				}
+				
+				return;
+			}
+		}
+	}
+}
+
+void UTraversalComponent::UpdateLegLocationIK(const bool bLeftLeg)
+{
+	if (TraversalState == ETraversalState::Climb && TraversalAnimInstance && CharacterRef)
+	{
+		FName CurveName = bLeftLeg ? FName("LeftFootIK") : FName("RightFootIK");
+		float CurveValue = TraversalAnimInstance->GetCurveValue(CurveName);
+
+		if (CurveValue == 1) // Braced Climbing
+		{
+			FVector FootSocketLocation = bLeftLeg ? CharacterMesh->GetSocketLocation(FName("ik_foot_l")) :
+											  CharacterMesh->GetSocketLocation(FName("ik_foot_r")); 
+
+			FVector HandLocation = bLeftLeg ? CharacterMesh->GetSocketLocation(FName("hand_l")) :
+											  CharacterMesh->GetSocketLocation(FName("hand_r")); 
+
+			FVector FootLocation(FootSocketLocation.X, FootSocketLocation.Y, HandLocation.Z);
+			FVector FootLocationDown = HelperFunc::MoveDown(FootLocation, UKismetMathLibrary::SelectFloat(135, 125, bLeftLeg));
+
+			for (int i = 0; i < 3; i++)
+			{
+				FVector FootMovedUpLocation = HelperFunc::MoveUp(FootLocationDown, i * 5);				
+
+				FVector FootTraceLocation = bLeftLeg ? HelperFunc::MoveRight(FootMovedUpLocation, 4, CharacterRef->GetActorRotation()) :
+								   HelperFunc::MoveLeft(FootMovedUpLocation, 4, CharacterRef->GetActorRotation());
+
+				FVector TraceStart = HelperFunc::MoveBackward(FootTraceLocation, 30, CharacterRef->GetActorRotation());
+				FVector TraceEnd = HelperFunc::MoveForward(FootTraceLocation, 70, CharacterRef->GetActorRotation());
+
+				TArray<AActor*> ActorsToIgnore;
+				FHitResult HitResult;
+
+				UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 6, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, HitResult, true);
+
+				if (HitResult.bBlockingHit && !HitResult.bStartPenetrating)
+				{
+					bLeftLeg ? TraversalAnimInstance->SetLeftFootLocation(HelperFunc::MoveBackward(HitResult.ImpactPoint, 17, HelperFunc::ReverseNormal(HitResult.ImpactNormal))) :
+							   TraversalAnimInstance->SetRightFootLocation(HelperFunc::MoveBackward(HitResult.ImpactPoint, 17, HelperFunc::ReverseNormal(HitResult.ImpactNormal)));
+					break;
+				}
+			}
+		}
+		else
+		{
+			ResetFootIK();
+		}
+	}
+}
+
+void UTraversalComponent::ResetFootIK()
+{
+	if (TraversalAnimInstance && CharacterMesh)
+	{
+		TraversalAnimInstance->SetRightFootLocation(CharacterMesh->GetSocketLocation(FName("ik_foot_r")));
+		TraversalAnimInstance->SetLeftFootLocation(CharacterMesh->GetSocketLocation(FName("ik_foot_l")));
 	}
 }
 
