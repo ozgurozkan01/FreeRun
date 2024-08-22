@@ -26,7 +26,8 @@ UTraversalComponent::UTraversalComponent() :
 	RightMovementValue(0),
 	ClimbMoveCheckDistance(10),
 	ClimbHandSpace(20),
-	bIsInLand(true)
+	bIsInLand(true),
+	bIsDropping(false)
 {
 	PrimaryComponentTick.bCanEverTick = true;
 }
@@ -67,7 +68,7 @@ void UTraversalComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 		ClearTraversalDatas();
 	}
 
-	else if (!bIsInLand && TraversalState == ETraversalState::FreeRoam)
+	else if (!bIsInLand && TraversalState == ETraversalState::FreeRoam && !bIsDropping)
 	{
 		TriggerTraversalAction(false);
 	}
@@ -212,6 +213,20 @@ float UTraversalComponent::GetClimbStyleValues(EClimbStyle ClimbStyle, float Bra
 	}
 }
 
+bool UTraversalComponent::ValidateAirHang()
+{
+	if (!NextClimbHitResult.bBlockingHit || CharacterMesh == nullptr) { return false; }
+
+	float ClimbLocationZ = NextClimbHitResult.ImpactPoint.Z;
+	float HeadLocationZ = CharacterMesh->GetSocketLocation(FName("head")).Z;
+
+	float Height = HeadLocationZ - ClimbLocationZ;
+
+	if (Height <= 30) { return false; }
+	
+	return true;
+}
+
 void UTraversalComponent::ValidateIsInLand()
 {
 	if (CharacterMesh)
@@ -283,20 +298,22 @@ void UTraversalComponent::ClearMovementDatas()
 	SetTraversalClimbDirection(EClimbDirection::NoDirection);
 }
 
-void UTraversalComponent::PlayTraversalMontage(const UTraversalActionData* CurrentActionData)
+void UTraversalComponent::PlayTraversalMontage()
 {
-	if (TraversalAnimInstance && CurrentActionData && MotionWarping)
+	if (TraversalAnimInstance && CurrentActionDataRef && MotionWarping)
 	{
-		SetTraversalState(CurrentActionData->InState);
+		SetTraversalState(CurrentActionDataRef->InState);
 
-		FVector TopLocation = FindWarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionData->Warp1XOffset, CurrentActionData->Warp1ZOffset);
+		DrawDebugSphere(GetWorld(), WallTopResult.ImpactPoint, 10, 15, FColor::Black, true);
+		
+		FVector TopLocation = FindWarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionDataRef->Warp1XOffset, CurrentActionDataRef->Warp1ZOffset);
 		MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(FName("TopResultWarp"), TopLocation, WallRotation);
-
-		FVector BalanceLocation = FindWarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionData->Warp2XOffset, CurrentActionData->Warp2ZOffset);
+		
+		FVector BalanceLocation = FindWarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionDataRef->Warp2XOffset, CurrentActionDataRef->Warp2ZOffset);
 		MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(FName("BalanceWarp"), BalanceLocation, WallRotation);
 
-		TraversalAnimInstance->Montage_Play(CurrentActionData->ActionMontage);
-		TraversalAnimInstance->Montage_GetBlendingOutDelegate(CurrentActionData->ActionMontage);
+		TraversalAnimInstance->Montage_Play(CurrentActionDataRef->ActionMontage);
+		TraversalAnimInstance->Montage_GetBlendingOutDelegate(CurrentActionDataRef->ActionMontage);
 	}
 }
 
@@ -309,7 +326,6 @@ void UTraversalComponent::ClimbMovement()
 	{
 		if (!(UKismetMathLibrary::Abs(RightMovementValue) > 0.7))
 		{
-			GEngine->AddOnScreenDebugMessage(136, 2, FColor::Orange, FString::Printf(TEXT("Stop Climb Movement y")));
 			StopClimbMovement();
 		}
 		else
@@ -318,7 +334,6 @@ void UTraversalComponent::ClimbMovement()
 
 			if (DirectionActor)
 			{
-				GEngine->AddOnScreenDebugMessage(136, 2, FColor::Orange, FString::Printf(TEXT("Stop Climb Movement t")));
 				FVector DirectionLocation = DirectionActor->ArrowComponent->GetComponentLocation();
 
 				//FVector DirectionForward = DirectionLocation + DirectionActor->ArrowComponent->GetForwardVector() * 200;
@@ -336,16 +351,13 @@ void UTraversalComponent::ClimbMovement()
 					TArray<AActor*> ActorsToIgnore;
 
 					UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbWallHitResult, true, FLinearColor::Black, FLinearColor::Blue, 20);
-					GEngine->AddOnScreenDebugMessage(137, 2, FColor::Orange, FString::Printf(TEXT("Stop Climb Movement ğ")));
 
 					if (!ClimbWallHitResult.bStartPenetrating)
 					{
-						GEngine->AddOnScreenDebugMessage(136, 2, FColor::Orange, FString::Printf(TEXT("Stop Climb Movement o")));
 
 						if (ClimbWallHitResult.bBlockingHit)
 						{
 							// DrawDebugSphere(GetWorld(), ClimbWallHitResult.ImpactPoint, 3, 12, FColor::Purple, false, 2);
-							GEngine->AddOnScreenDebugMessage(138, 2, FColor::Orange, FString::Printf(TEXT("Stop Climb Movement l")));
 							WallRotation = HelperFunc::ReverseNormal(ClimbWallHitResult.ImpactNormal);
 
 							FVector MovedForward = HelperFunc::MoveForward(ClimbWallHitResult.ImpactPoint, 2, WallRotation);
@@ -360,7 +372,6 @@ void UTraversalComponent::ClimbMovement()
 
 								if (ClimbTopHitResult.bStartPenetrating)
 								{
-									GEngine->AddOnScreenDebugMessage(139, 2, FColor::Orange, FString::Printf(TEXT("Stop Climb Movement k")));
 									if (Index == 2 && j == 6)
 									{
 										StopClimbMovement();
@@ -370,7 +381,6 @@ void UTraversalComponent::ClimbMovement()
 								{
 									if (!ClimbTopHitResult.bBlockingHit)
 									{
-										GEngine->AddOnScreenDebugMessage(140, 2, FColor::Orange, FString::Printf(TEXT("Stop Climb Movement z")));
 										StopClimbMovement();
 									}
 									else
@@ -401,7 +411,6 @@ void UTraversalComponent::ClimbMovement()
 						
 						if (Index != 2)
 						{
-							GEngine->AddOnScreenDebugMessage(143, 2, FColor::Orange, FString::Printf(TEXT("asifk")));
 							StopClimbMovement();
 						}
 					}
@@ -429,12 +438,23 @@ void UTraversalComponent::UpdateClimbLocation(FVector Location, FRotator Rotatio
 	float InterpSpeed = 2.f;
 	
 	float X = FMath::FInterpTo(CharacterLocation.X, Location.X, DeltaSeconds, InterpSpeed); // X
-	float Y = FMath::FInterpTo(CharacterLocation.Y, Location.Y, DeltaSeconds, InterpSpeed); // Y
+	float Y = FMath::FInterpTo(CharacterLocation.Y, Location.Y , DeltaSeconds, InterpSpeed); // Y
 	float Z = FMath::FInterpTo(CharacterLocation.Z, Location.Z - GetClimbStyleValues(TraversalClimbStyle, 107.f, 115.f), DeltaSeconds, GetClimbStyleValues(TraversalClimbStyle, 20, 10)); // Z
 
 	FVector NewLocation(X,Y,Z);
 	
 	CharacterRef->SetActorLocationAndRotation(NewLocation, Rotation);
+}
+
+void UTraversalComponent::DropFromClimb()
+{
+	if (!bIsInLand && TraversalState == ETraversalState::Climb)
+	{
+		SetTraversalState(ETraversalState::FreeRoam);
+		bIsDropping = true;
+		GetWorld()->GetTimerManager().SetTimer(DroppingTimerHandle, this, &UTraversalComponent::DeactivateDropping, 0.5f, false);
+
+	}
 }
 
 void UTraversalComponent::ClimbMovementIK()
@@ -594,13 +614,34 @@ void UTraversalComponent::DecideTraversalType(bool bActionTriggered)
 				else
 				{
 					SetTraversalAction(ETraversalAction::FreeHang);
-				}
+				}	
 			}
 			else
 			{
 				SetTraversalAction(ETraversalAction::NoAction);
 			}
-		}	
+		}
+		else
+		{
+			if (WallHeight < 250.f)
+			{
+				DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
+
+				NextClimbHitResult = WallTopResult;
+
+				if (ValidateAirHang())
+				{
+					if (TraversalAction == ETraversalAction::FreeHangFallingClimb)
+					{
+						SetTraversalAction(ETraversalAction::FreeHangFallingClimb);
+					}
+					else
+					{
+						SetTraversalAction(ETraversalAction::BracedClimbFallingClimb);
+					}	
+				}	
+			}
+		}
 		break;
 	}
 	}
@@ -626,14 +667,28 @@ void UTraversalComponent::SetTraversalAction(ETraversalAction NewAction)
 			if (BracedJumpToClimbData)
 			{
 				CurrentActionDataRef = BracedJumpToClimbData;
-				PlayTraversalMontage(BracedJumpToClimbData);
+				PlayTraversalMontage();
 			}
 			break;
 		case ETraversalAction::FreeHang:
-			if (FreeHangJumpToClimb)
+			if (FreeHangJumpToClimbData)
 			{
-				CurrentActionDataRef = FreeHangJumpToClimb;
-				PlayTraversalMontage(FreeHangJumpToClimb);
+				CurrentActionDataRef = FreeHangJumpToClimbData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::FreeHangFallingClimb:
+			if (FreeHangFallingClimbData)
+			{
+				CurrentActionDataRef = FreeHangFallingClimbData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::BracedClimbFallingClimb:
+			if (BracedFallingClimbData)
+			{
+				CurrentActionDataRef = BracedFallingClimbData;
+				PlayTraversalMontage();
 			}
 			break;
 		}
@@ -841,6 +896,8 @@ void UTraversalComponent::CalculateVaultHeight()
 
 void UTraversalComponent::CalculateNextHandClimbLocationIK(const bool bLeftHand)
 {
+	if (DirectionActor == nullptr) { return ; }
+	
 	FHitResult ClimbWallHitResult;
 	FHitResult ClimbTopHitResult;
 	FRotator ClimbHandRotation;
@@ -937,7 +994,7 @@ void UTraversalComponent::CalculateNextLegClimbLocationIK(const bool bLeftLeg)
 
 void UTraversalComponent::UpdateHandLocationIK(const bool bLeftHand)
 {
-	if (CharacterMesh == nullptr || CharacterRef == nullptr) { return; }
+	if (CharacterMesh == nullptr || CharacterRef == nullptr || DirectionActor == nullptr) { return; }
 
 	if (TraversalState == ETraversalState::Climb)
 	{
