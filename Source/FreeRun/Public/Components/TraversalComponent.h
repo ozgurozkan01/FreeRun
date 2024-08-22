@@ -48,17 +48,22 @@ public:
 	void SetTraversalAction(ETraversalAction NewAction);
 	void ClearTraversalDatas();
 	void ClearMovementDatas();
-	void PlayTraversalMontage(const UTraversalActionData* CurrentActionData);
+	void PlayTraversalMontage();
 	void ClimbMovement();
 	void StopClimbMovement();
 	void UpdateClimbLocation(FVector Location, FRotator Rotation);
+	void DropFromClimb();
+
+	FORCEINLINE void DeactivateDropping() { bIsDropping = false; }
+	FORCEINLINE ETraversalState GetTraversalState() { return TraversalState; }
 	
 	// IK SECTION
-	void ClimbMovementIK();
 	UFUNCTION(BlueprintCallable)
 	void CalculateNextHandClimbLocationIK(const bool bLeftHand);
 	UFUNCTION(BlueprintCallable)
 	void CalculateNextLegClimbLocationIK(const bool bLeftLeg);
+	UFUNCTION(BlueprintCallable)
+	void ClimbMovementIK();
 	void UpdateHandLocationIK(const bool bLeftHand);
 	void UpdateLegLocationIK(const bool bLeftLeg);
 	void ResetFootIK();
@@ -78,6 +83,7 @@ public:
 	FHitResult DetectWall();
 	float GetClimbStyleValues(EClimbStyle ClimbStyle, float Braced, float Hang);
 
+	bool ValidateAirHang();
 	void ValidateIsInLand();
 	bool ValidateClimbSurface(FVector ImpactLocation);
 
@@ -98,13 +104,16 @@ private:
 	UCameraComponent* Camera;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	ADirectionActor* DirectionActor;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
-	// UTraversalActionData* CurrentActionData;
-	//UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UTraversalActionData* BracedJumpToClimbData;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
-	UTraversalActionData* FreeHangJumpToClimb;
+	UTraversalActionData* FreeHangJumpToClimbData;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* BracedFallingClimbData;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* FreeHangFallingClimbData;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UTraversalActionData* CurrentActionDataRef;
 	
 	UPROPERTY(VisibleAnywhere)
@@ -128,6 +137,8 @@ private:
 	
 	FRotator WallRotation;
 
+	FTimerHandle DroppingTimerHandle;
+	
 	float WallHeight;
 	float WallDepth;
 	float VaultHeight;
@@ -137,6 +148,7 @@ private:
 	float ClimbHandSpace;
 	
 	bool bIsInLand;
+	bool bIsDropping;
 	
 	UPROPERTY(EditDefaultsOnly, meta=(AllowPrivateAccess="true"))
 	TSubclassOf<ADirectionActor> DirectionActorClass;
