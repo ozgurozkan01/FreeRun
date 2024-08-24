@@ -37,6 +37,7 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	void GridScanner(int Width, int Height, FVector BaseLocation, FRotator CurrentWorldRotation);
 	void AddMovementInput(float ScaleValue, bool bIsFront);
 	void InitializeReferences(ACharacter* Character, UMotionWarpingComponent* MotionWarpingComponent, UCameraComponent* CameraComponent);
 	void TraversalStateSettings(ECollisionEnabled::Type IsEnabled, EMovementMode NewMovementMode, bool bStopMovementImmediately);
@@ -44,49 +45,50 @@ public:
 	void SetTraversalClimbStyle(EClimbStyle NewStyle);
 	void SetTraversalClimbDirection(EClimbDirection NewDirection);
 	void TriggerTraversalAction(bool bActionTriggered);
-	void DecideTraversalType(bool bActionTriggered);
 	void SetTraversalAction(ETraversalAction NewAction);
 	void ClearTraversalDatas();
 	void ClearMovementDatas();
 	void PlayTraversalMontage();
 	void ClimbMovement();
 	void StopClimbMovement();
-	void UpdateClimbLocation(FVector Location, FRotator Rotation);
 	void DropFromClimb();
-
+	
+	void DecideTraversalType(bool bActionTriggered);
+	void DecideClimbStyle(FVector Location, FRotator Rotation);
+	void DecideClimbOrHop();
+	
 	FORCEINLINE void DeactivateDropping() { bIsDropping = false; }
 	FORCEINLINE ETraversalState GetTraversalState() { return TraversalState; }
 	
-	// IK SECTION
-	UFUNCTION(BlueprintCallable)
-	void CalculateNextHandClimbLocationIK(const bool bLeftHand);
-	UFUNCTION(BlueprintCallable)
-	void CalculateNextLegClimbLocationIK(const bool bLeftLeg);
 	UFUNCTION(BlueprintCallable)
 	void ClimbMovementIK();
 	void UpdateHandLocationIK(const bool bLeftHand);
 	void UpdateLegLocationIK(const bool bLeftLeg);
+	void UpdateClimbLocation(FVector Location, FRotator Rotation);
 	void ResetFootIK();
 	
 	bool ClimbSideCheck(FVector ImpactPoint);
-	void DecideClimbStyle(FVector Location, FRotator Rotation);
 	FVector FindWarpLocation(FVector Location, FRotator Rotation, float XOffset, float ZOffset) const;
-	
-	// WALL IMPLEMENTATIONS
-	void GridScanner(int Width, int Height, FVector BaseLocation, FRotator CurrentWorldRotation);
+	EClimbDirection GetControllerDirection();
+	FString GetControllerDirectionAsString();
+
+	UFUNCTION(BlueprintCallable)
+	void CalculateNextHandClimbLocationIK(const bool bLeftHand);
+	UFUNCTION(BlueprintCallable)
+	void CalculateNextLegClimbLocationIK(const bool bLeftLeg);
 	void CalculateWallMeasures();
 	void CalculateWallHeight();
 	void CalculateWallDepth();
 	void CalculateVaultHeight();
-
-
+	
 	FHitResult DetectWall();
 	float GetClimbStyleValues(EClimbStyle ClimbStyle, float Braced, float Hang);
 
 	bool ValidateAirHang();
 	void ValidateIsInLand();
 	bool ValidateClimbSurface(FVector ImpactLocation);
-
+	bool ValidateMantleSurface();
+	
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	ACharacter* CharacterRef;
@@ -112,7 +114,11 @@ private:
 	UTraversalActionData* BracedFallingClimbData;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UTraversalActionData* FreeHangFallingClimbData;
-
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* BracedClimbUpData;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* FreeHangClimbUpData;
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UTraversalActionData* CurrentActionDataRef;
 	
