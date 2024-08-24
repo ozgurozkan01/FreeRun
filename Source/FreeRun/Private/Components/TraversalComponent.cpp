@@ -623,24 +623,21 @@ void UTraversalComponent::DecideTraversalType(bool bActionTriggered)
 		}
 		else
 		{
-			if (WallHeight < 250.f)
+			DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
+
+			NextClimbHitResult = WallTopResult;
+
+			if (ValidateAirHang())
 			{
-				DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
-
-				NextClimbHitResult = WallTopResult;
-
-				if (ValidateAirHang())
+				if (TraversalClimbStyle == EClimbStyle::BracedClimb)
 				{
-					if (TraversalAction == ETraversalAction::FreeHangFallingClimb)
-					{
-						SetTraversalAction(ETraversalAction::FreeHangFallingClimb);
-					}
-					else
-					{
-						SetTraversalAction(ETraversalAction::BracedClimbFallingClimb);
-					}	
+					SetTraversalAction(ETraversalAction::BracedClimbFallingClimb);
+				}
+				else
+				{
+					SetTraversalAction(ETraversalAction::FreeHangFallingClimb);
 				}	
-			}
+			}	
 		}
 		break;
 	}
