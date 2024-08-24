@@ -74,6 +74,8 @@ void UTraversalComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	}
 
 	ClimbMovementIK();
+
+	GEngine->AddOnScreenDebugMessage(654, -1, FColor::Emerald, FString::Printf(TEXT("%s"), *GetControllerDirectionAsString()));
 }
 
 void UTraversalComponent::OnMontageBlendOut(UAnimMontage* Montage, bool bInterrupted)
@@ -274,9 +276,52 @@ bool UTraversalComponent::ValidateClimbSurface(FVector ImpactLocation)
 	TArray<AActor*> ActorsToIgnore;
 	FHitResult SurfaceHit;
 	
-	bool bCanClimbMode = UKismetSystemLibrary::CapsuleTraceSingle(this, TraceStart, TraceEnd, 5, 82, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, SurfaceHit, true, FLinearColor::White, FLinearColor::Gray);
+	bool bCanClimbMode = UKismetSystemLibrary::CapsuleTraceSingle(
+		this,
+		TraceStart,
+		TraceEnd,
+		5,
+		82,
+		TraceTypeQuery1,
+		false,
+		ActorsToIgnore,
+		EDrawDebugTrace::None,
+		SurfaceHit,
+		true,
+		FLinearColor::White,
+		FLinearColor::Gray);
 
 	return !bCanClimbMode;
+}
+
+bool UTraversalComponent::ValidateMantleSurface()
+{
+	if (CapsuleComponent == nullptr) { return false; }
+	
+	float UpValue = CapsuleComponent->GetScaledCapsuleHalfHeight() + 10;
+	FVector TraceStart = HelperFunc::MoveUp(WallTopResult.ImpactPoint, UpValue);
+	FVector TraceEnd = TraceStart;
+
+	TArray<AActor*> ActorsToIgnore;
+	FHitResult MantleHit;
+
+	bool bCanClimb = UKismetSystemLibrary::CapsuleTraceSingle(this,
+		TraceStart,
+		TraceEnd,
+		25,
+		CapsuleComponent->GetScaledCapsuleHalfHeight(),
+		TraceTypeQuery1,
+		false,
+		ActorsToIgnore,
+		EDrawDebugTrace::ForDuration,
+		MantleHit,
+		true,
+		FLinearColor::White,
+FLinearColor::Gray,
+	2);
+	// If capsule hit something, character cannot climb the wall
+
+	return !bCanClimb;
 }
 
 void UTraversalComponent::ClearTraversalDatas()
@@ -518,6 +563,26 @@ void UTraversalComponent::DecideClimbStyle(FVector Location, FRotator Rotation)
 	}
 }
 
+void UTraversalComponent::DecideClimbOrHop()
+{
+	// Move Forward
+	if (GetControllerDirection() == EClimbDirection::Forward ||
+  	    GetControllerDirection() == EClimbDirection::ForwardLeft ||
+	    GetControllerDirection() == EClimbDirection::ForwardRight
+	)
+	{
+		if (ValidateMantleSurface())
+		{
+			if (TraversalClimbStyle == EClimbStyle::BracedClimb) { SetTraversalAction(ETraversalAction::BracedClimbClimbUp); }
+			else { SetTraversalAction(ETraversalAction::FreeHangClimbUp); }
+		}
+		else
+		{
+			// CANNOT CLIMB
+		}
+	}
+}
+
 FVector UTraversalComponent::FindWarpLocation(FVector Location, FRotator Rotation, float XOffset, float ZOffset) const
 {
 	FVector Forward = HelperFunc::MoveForward(Location, XOffset, Rotation);
@@ -565,10 +630,12 @@ void UTraversalComponent::DecideTraversalType(bool bActionTriggered)
 		return;
 	}
 
+	GEngine->AddOnScreenDebugMessage(136, 2, FColor::Orange, FString::Printf(TEXT("Wall Detected")));
+	
 	switch (TraversalState)
 	{
 	case ETraversalState::Climb:
-			
+		DecideClimbOrHop();
 		break;
 	case ETraversalState::FreeRoam:
 	{
@@ -685,6 +752,20 @@ void UTraversalComponent::SetTraversalAction(ETraversalAction NewAction)
 			if (BracedFallingClimbData)
 			{
 				CurrentActionDataRef = BracedFallingClimbData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::BracedClimbClimbUp:
+			if (BracedClimbUpData)
+			{
+				CurrentActionDataRef = BracedClimbUpData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::FreeHangClimbUp:
+			if (FreeHangClimbUpData)
+			{
+				CurrentActionDataRef = FreeHangClimbUpData;
 				PlayTraversalMontage();
 			}
 			break;
@@ -848,9 +929,9 @@ void UTraversalComponent::CalculateWallMeasures()
 	CalculateWallDepth();
 	CalculateVaultHeight();
 
-	GEngine->AddOnScreenDebugMessage(132, 2, FColor::Orange, FString::Printf(TEXT("Wall Height  : %f"), WallHeight));
-	GEngine->AddOnScreenDebugMessage(133, 2, FColor::Orange, FString::Printf(TEXT("Wall Depth   : %f"), WallDepth));
-	GEngine->AddOnScreenDebugMessage(134, 2, FColor::Orange, FString::Printf(TEXT("Vault Height : %f"), VaultHeight));
+	// GEngine->AddOnScreenDebugMessage(132, 2, FColor::Orange, FString::Printf(TEXT("Wall Height  : %f"), WallHeight));
+	// GEngine->AddOnScreenDebugMessage(133, 2, FColor::Orange, FString::Printf(TEXT("Wall Depth   : %f"), WallDepth));
+	// GEngine->AddOnScreenDebugMessage(134, 2, FColor::Orange, FString::Printf(TEXT("Vault Height : %f"), VaultHeight));
 }
 
 void UTraversalComponent::CalculateWallHeight()
@@ -889,6 +970,37 @@ void UTraversalComponent::CalculateVaultHeight()
 	}
 
 	VaultHeight = WallDepthResult.ImpactPoint.Z - WallVaultResult.ImpactPoint.Z;
+}
+
+EClimbDirection UTraversalComponent::GetControllerDirection()
+{
+	if (ForwardMovementValue == 0 && RightMovementValue > 0) { return EClimbDirection::Right; }
+	if (ForwardMovementValue == 0 && RightMovementValue < 0) { return EClimbDirection::Left; }
+	if (ForwardMovementValue > 0 && RightMovementValue == 0) { return EClimbDirection::Forward; }
+	if (ForwardMovementValue < 0 && RightMovementValue == 0) { return EClimbDirection::Backward; }
+
+	if (ForwardMovementValue < 0 && RightMovementValue < 0) { return EClimbDirection::BackwardLeft; }
+	if (ForwardMovementValue < 0 && RightMovementValue > 0) { return EClimbDirection::BackwardRight; }
+	if (ForwardMovementValue > 0 && RightMovementValue < 0) { return EClimbDirection::ForwardLeft; }
+	if (ForwardMovementValue > 0 && RightMovementValue > 0) { return EClimbDirection::ForwardRight; }
+
+	return EClimbDirection::NoDirection;
+}
+
+FString UTraversalComponent::GetControllerDirectionAsString()
+{
+	switch (GetControllerDirection())
+	{
+	case EClimbDirection::Left: return "Left";
+	case EClimbDirection::Right: return "Right";
+	case EClimbDirection::Forward: return "Forward";
+	case EClimbDirection::Backward: return "Backward";
+	case EClimbDirection::ForwardLeft: return "ForwardLeft";
+	case EClimbDirection::ForwardRight: return "ForwardRight";
+	case EClimbDirection::BackwardLeft: return "BackwardLeft";
+	case EClimbDirection::BackwardRight: return "BackwardRight";
+	default: return "NoDirection";
+	}
 }
 
 void UTraversalComponent::CalculateNextHandClimbLocationIK(const bool bLeftHand)
