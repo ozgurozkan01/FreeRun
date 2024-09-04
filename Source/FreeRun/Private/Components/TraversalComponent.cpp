@@ -19,6 +19,7 @@ UTraversalComponent::UTraversalComponent() :
 	TraversalClimbStyle(EClimbStyle::BracedClimb),
 	TraversalClimbDirection(EClimbDirection::NoDirection),
 	TraversalAction(ETraversalAction::NoAction),
+	WallRotation(FRotator::ZeroRotator),
 	WallHeight(0),
 	WallDepth(0),
 	VaultHeight(0),
@@ -26,6 +27,8 @@ UTraversalComponent::UTraversalComponent() :
 	RightMovementValue(0),
 	ClimbMoveCheckDistance(10),
 	ClimbHandSpace(20),
+	HorizontalHopDistance(0),
+	VerticalHopDistance(0),
 	bIsInLand(true),
 	bIsDropping(false)
 {
@@ -205,7 +208,7 @@ void UTraversalComponent::SetTraversalClimbDirection(EClimbDirection NewDirectio
 	}
 }
 
-float UTraversalComponent::GetClimbStyleValues(EClimbStyle ClimbStyle, float Braced, float Hang)
+float UTraversalComponent::GetClimbStyleValue(EClimbStyle ClimbStyle, float Braced, float Hang)
 {
 	switch (ClimbStyle)
 	{
@@ -213,6 +216,45 @@ float UTraversalComponent::GetClimbStyleValues(EClimbStyle ClimbStyle, float Bra
 	case EClimbStyle::FreeHang:		return Hang;
 	default: return 0;
 	}
+}
+
+float UTraversalComponent::GetDirectionValue(EClimbDirection ClimbDirection, FClimbDirectionsValueInfo DirectionInfo)
+{
+	switch (ClimbDirection) {
+	case EClimbDirection::NoDirection:	 return 0;
+	case EClimbDirection::Left:			 return DirectionInfo.Left;
+	case EClimbDirection::Right:		 return DirectionInfo.Right;
+	case EClimbDirection::Forward:		 return DirectionInfo.Forward;
+	case EClimbDirection::Backward:		 return DirectionInfo.Backward;
+	case EClimbDirection::ForwardLeft:	 return DirectionInfo.ForwardLeft;
+	case EClimbDirection::ForwardRight:  return DirectionInfo.ForwardRight;
+	case EClimbDirection::BackwardLeft:  return DirectionInfo.BackwardLeft;
+	case EClimbDirection::BackwardRight: return DirectionInfo.BackwardRight;
+	default: return 0;
+	}
+}
+
+float UTraversalComponent::GetTraversalStateValues(ETraversalState CurrentState, float Climb, float FreeRoam, float ReadyToClimb)
+{
+	switch (TraversalState) {
+	case ETraversalState::FreeRoam: return FreeRoam;
+	case ETraversalState::ReadyToClimb: return ReadyToClimb;
+	case ETraversalState::Climb: return Climb;
+	default: return 0;
+	}
+}
+
+float UTraversalComponent::GetCharacterHandHeight()
+{
+	if (CharacterMesh)
+	{
+		FVector RightHandLocation = CharacterMesh->GetSocketLocation("hand_r");
+		FVector LeftHandLocation = CharacterMesh->GetSocketLocation("hand_l");
+
+		return UKismetMathLibrary::SelectFloat(LeftHandLocation.Z, RightHandLocation.Z, RightHandLocation.Z < LeftHandLocation.Z);
+	}
+
+	return 0;
 }
 
 bool UTraversalComponent::ValidateAirHang()
@@ -348,8 +390,6 @@ void UTraversalComponent::PlayTraversalMontage()
 	if (TraversalAnimInstance && CurrentActionDataRef && MotionWarping)
 	{
 		SetTraversalState(CurrentActionDataRef->InState);
-
-		DrawDebugSphere(GetWorld(), WallTopResult.ImpactPoint, 10, 15, FColor::Black, true);
 		
 		FVector TopLocation = FindWarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionDataRef->Warp1XOffset, CurrentActionDataRef->Warp1ZOffset);
 		MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(FName("TopResultWarp"), TopLocation, WallRotation);
@@ -392,7 +432,7 @@ void UTraversalComponent::ClimbMovement()
 					
 					FVector MoveRight = HelperFunc::MoveRight(DirectionLocation, ClimbMoveCheckDistance * RightMovementValue, DirectionRotation);
 					FVector TraceStart = HelperFunc::MoveDown(MoveRight, i * 10);
-					FVector TraceEnd = HelperFunc::MoveForward(TraceStart, 60, DirectionRotation);
+					FVector TraceEnd = HelperFunc::MoveForward(TraceStart, 40, DirectionRotation);
 					TArray<AActor*> ActorsToIgnore;
 
 					UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbWallHitResult, true, FLinearColor::Black, FLinearColor::Blue, 20);
@@ -439,11 +479,11 @@ void UTraversalComponent::ClimbMovement()
 											}
 											else
 											{
-												FVector MovedBackward = HelperFunc::MoveBackward(ClimbWallHitResult.ImpactPoint, GetClimbStyleValues(TraversalClimbStyle, 35, 7), WallRotation);
+												FVector MovedBackward = HelperFunc::MoveBackward(ClimbWallHitResult.ImpactPoint, GetClimbStyleValue(TraversalClimbStyle, 35, 7), WallRotation);
 												FVector InputLocation{MovedBackward.X, MovedBackward.Y, ClimbTopHitResult.ImpactPoint.Z};
-												
-												UpdateClimbLocation(InputLocation, WallRotation);
+
 												DecideClimbStyle(ClimbTopHitResult.ImpactPoint, WallRotation);
+												UpdateClimbLocation(InputLocation, WallRotation);
 											}
 										}
 										return; // Break the outter loop.
@@ -480,11 +520,11 @@ void UTraversalComponent::UpdateClimbLocation(FVector Location, FRotator Rotatio
 
 	FVector CharacterLocation = CharacterRef->GetActorLocation();
 	float DeltaSeconds = GetWorld()->GetDeltaSeconds();
-	float InterpSpeed = 2.f;
+	float InterpSpeed = TraversalClimbStyle== EClimbStyle::BracedClimb ? 3.5 : 1.85f;
 	
 	float X = FMath::FInterpTo(CharacterLocation.X, Location.X, DeltaSeconds, InterpSpeed); // X
 	float Y = FMath::FInterpTo(CharacterLocation.Y, Location.Y , DeltaSeconds, InterpSpeed); // Y
-	float Z = FMath::FInterpTo(CharacterLocation.Z, Location.Z - GetClimbStyleValues(TraversalClimbStyle, 107.f, 115.f), DeltaSeconds, GetClimbStyleValues(TraversalClimbStyle, 20, 10)); // Z
+	float Z = FMath::FInterpTo(CharacterLocation.Z, Location.Z - GetClimbStyleValue(TraversalClimbStyle, 107.f, 115.f), DeltaSeconds, GetClimbStyleValue(TraversalClimbStyle, 20, 10)); // Z
 
 	FVector NewLocation(X,Y,Z);
 	
@@ -499,6 +539,26 @@ void UTraversalComponent::DropFromClimb()
 		bIsDropping = true;
 		GetWorld()->GetTimerManager().SetTimer(DroppingTimerHandle, this, &UTraversalComponent::DeactivateDropping, 0.5f, false);
 
+	}
+}
+
+ETraversalAction UTraversalComponent::SelectHopAction()
+{
+	
+
+	
+	switch (GetControllerDirection())
+	{
+	case EClimbDirection::NoDirection:	 return ETraversalAction::NoAction;
+	case EClimbDirection::Left:			 return TraversalClimbStyle == EClimbStyle::BracedClimb ? ETraversalAction::BracedClimbHopLeft : ETraversalAction::FreeHangHopLeft;
+	case EClimbDirection::Right:		 return TraversalClimbStyle == EClimbStyle::BracedClimb ? ETraversalAction::BracedClimbHopRight : ETraversalAction::FreeHangHopRight;
+	case EClimbDirection::Forward:		 return ETraversalAction::BracedClimbHopUp;
+	case EClimbDirection::Backward:		 return TraversalClimbStyle == EClimbStyle::BracedClimb ? ETraversalAction::BracedClimbHopDown : ETraversalAction::FreeHangHopDown;
+	case EClimbDirection::ForwardLeft:   return TraversalClimbStyle == EClimbStyle::BracedClimb ? ETraversalAction::BracedClimbHopLeftUp : ETraversalAction::FreeHangHopLeft;
+	case EClimbDirection::ForwardRight:  return TraversalClimbStyle == EClimbStyle::BracedClimb ? ETraversalAction::BracedClimbHopRightUp : ETraversalAction::FreeHangHopRight;
+	case EClimbDirection::BackwardLeft:  return TraversalClimbStyle == EClimbStyle::BracedClimb ? ETraversalAction::BracedClimbHopLeft : ETraversalAction::FreeHangHopLeft;
+	case EClimbDirection::BackwardRight: return TraversalClimbStyle == EClimbStyle::BracedClimb ? ETraversalAction::BracedClimbHopRight : ETraversalAction::FreeHangHopRight;
+	default: return ETraversalAction::NoAction;
 	}
 }
 
@@ -578,8 +638,20 @@ void UTraversalComponent::DecideClimbOrHop()
 		}
 		else
 		{
-			// CANNOT CLIMB
+			CurrentClimbHitResult = WallTopResult;
+			CalculateHopLocation();
+			DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
+			NextClimbHitResult = WallTopResult;
+			SetTraversalAction(SelectHopAction());
 		}
+	}
+	else
+	{
+		CurrentClimbHitResult = WallTopResult;
+		CalculateHopLocation();
+		DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
+		NextClimbHitResult = WallTopResult;
+		SetTraversalAction(SelectHopAction());
 	}
 }
 
@@ -609,7 +681,14 @@ void UTraversalComponent::TriggerTraversalAction(bool bActionTriggered)
 		{
 			// GEngine->AddOnScreenDebugMessage(136, 2, FColor::Orange, FString::Printf(TEXT("Wall Detected")));
 			FRotator CurrentRotation = HelperFunc::ReverseNormal(DetectedHit.ImpactNormal);
-			GridScanner(4, 30, DetectedHit.ImpactPoint, CurrentRotation);
+			
+			float Width = GetTraversalStateValues(TraversalState, 2, 4, 0);
+			float Height = GetTraversalStateValues(TraversalState, 7, 30, 0);
+
+			float BaseLocationZ = GetTraversalStateValues(TraversalState, GetCharacterHandHeight(), DetectedHit.ImpactPoint.Z, 0);
+			FVector BaseLocation(DetectedHit.ImpactPoint.X, DetectedHit.ImpactPoint.Y, BaseLocationZ);
+			
+			GridScanner(Width, Height, BaseLocation, CurrentRotation);
 			CalculateWallMeasures();
 			DecideTraversalType(bActionTriggered);	
 		}
@@ -766,6 +845,69 @@ void UTraversalComponent::SetTraversalAction(ETraversalAction NewAction)
 			if (FreeHangClimbUpData)
 			{
 				CurrentActionDataRef = FreeHangClimbUpData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::BracedClimbHopDown:
+			if (BracedHopDownData)
+			{
+				CurrentActionDataRef = BracedHopDownData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::BracedClimbHopUp:
+			if (BracedHopUpData)
+			{
+				CurrentActionDataRef = BracedHopUpData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::BracedClimbHopLeft:
+			if (BracedHopLeftData)
+			{
+				CurrentActionDataRef = BracedHopLeftData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::BracedClimbHopRight:
+			if (BracedHopRightData)
+			{
+				CurrentActionDataRef = BracedHopRightData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::BracedClimbHopRightUp:
+			if (BracedHopRightUpData)
+			{
+				CurrentActionDataRef = BracedHopRightUpData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::BracedClimbHopLeftUp:
+			if (BracedHopLeftUpData)
+			{
+				CurrentActionDataRef = BracedHopLeftUpData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::FreeHangHopDown:
+			if (FreeHangHopDown)
+			{
+				CurrentActionDataRef = FreeHangHopDown;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::FreeHangHopLeft:
+			if (FreeHangHopLeft)
+			{
+				CurrentActionDataRef = FreeHangHopLeft;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::FreeHangHopRight:
+			if (FreeHangHopRight)
+			{
+				CurrentActionDataRef = FreeHangHopRight;
 				PlayTraversalMontage();
 			}
 			break;
@@ -970,6 +1112,23 @@ void UTraversalComponent::CalculateVaultHeight()
 	}
 
 	VaultHeight = WallDepthResult.ImpactPoint.Z - WallVaultResult.ImpactPoint.Z;
+}
+
+void UTraversalComponent::Calculate2DHopDistance()
+{
+	FClimbDirectionsValueInfo VerticalDirectionInfo{1, -7.5, -2.5, -2.5, 0.5, 0.5, -4, -4};
+	VerticalHopDistance = GetDirectionValue(GetControllerDirection(), VerticalDirectionInfo) * 25.f;
+
+	FClimbDirectionsValueInfo HorizontalDirectionInfo{0, 0, -1, 1, -0.75, 0.75,-0.75, 0.75};
+	HorizontalHopDistance = GetDirectionValue(GetControllerDirection(), HorizontalDirectionInfo) * 140.f;
+}
+
+void UTraversalComponent::CalculateHopLocation()
+{
+	Calculate2DHopDistance();
+
+	FVector BaseLocation = HelperFunc::MoveUp(HelperFunc::MoveRight(WallTopResult.ImpactPoint, HorizontalHopDistance, WallRotation), VerticalHopDistance);
+	GridScanner(5, 20, BaseLocation, WallRotation);
 }
 
 EClimbDirection UTraversalComponent::GetControllerDirection()
