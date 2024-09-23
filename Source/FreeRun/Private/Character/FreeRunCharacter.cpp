@@ -78,19 +78,18 @@ void AFreeRunCharacter::BeginPlay()
 void AFreeRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
+	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
+	{
 		//Jumping
-		// EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &AFreeRunCharacter::SpaceBarPressed);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
-
 		//Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AFreeRunCharacter::Move);
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &AFreeRunCharacter::StopMove);
 		//Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AFreeRunCharacter::Look);
-
+		//Drop From Climb
+		EnhancedInputComponent->BindAction(DropAction, ETriggerEvent::Triggered, this, &AFreeRunCharacter::Drop);
 	}
 
 }
@@ -110,7 +109,7 @@ void AFreeRunCharacter::SpaceBarPressed()
 		FRotator CurrentRotation = HelperFunc::ReverseNormal(DetectedHit.ImpactNormal);
 		TraversalComp->GridScanner(4, 30, DetectedHit.ImpactPoint, CurrentRotation);
 	}*/
-
+	
 	TraversalComp->TriggerTraversalAction(true);
 }
 
@@ -142,7 +141,6 @@ void AFreeRunCharacter::Move(const FInputActionValue& Value)
 
 void AFreeRunCharacter::StopMove(const FInputActionValue& Value)
 {
-	GEngine->AddOnScreenDebugMessage(131231236, 2, FColor::Orange, FString::Printf(TEXT("CLEAR MOVE DATAS")));
 	TraversalComp->ClearMovementDatas();
 }
 
@@ -156,6 +154,14 @@ void AFreeRunCharacter::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void AFreeRunCharacter::Drop(const FInputActionValue& Value)
+{
+	if (TraversalComp)
+	{
+		TraversalComp->DropFromClimb();
 	}
 }
 

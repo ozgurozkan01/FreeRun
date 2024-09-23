@@ -39,6 +39,10 @@ class AFreeRunCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
+	/** Drop Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* DropAction;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UTraversalComponent* TraversalComp;
 
@@ -51,7 +55,8 @@ protected:
 	void Move(const FInputActionValue& Value);
 	void StopMove(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
-
+	void Drop(const FInputActionValue& Value);
+	
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	virtual void BeginPlay();
 
