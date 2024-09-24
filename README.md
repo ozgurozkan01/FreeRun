@@ -2,10 +2,10 @@
 
 ### -- WARNING !! THIS PROJECT JUST HAS MECHANIC CODE. NOT ASSETS OR ANIMATIONS !! --
 
-#### - Content -
+### - Content -
 This game is a traversal system based parkour game in which you run parkour, climb walls, jump over walls, etc.
 
-#### - Gifs -
+### - Gifs -
 
 |                                                   |                                                     |
 :-------------------------------------------------:|:---------------------------------------------------:
