@@ -19,3 +19,5 @@ This game is a traversal system based parkour game in which you run parkour, cli
 | <img src="./Gifs/Braced_ClimbUp.gif" width="400"> | <img src="./Gifs/FreeHang_ClimbUp.gif" width="400"> |
 |                       VAULT                       |                       MANTLE                        |
 |     <img src="./Gifs/Vault.gif" width="400">      |      <img src="./Gifs/Mantle.gif" width="400">      |
+
+###### NOTE : LOADING GIFS MIGHT TAKE SOME TIME
