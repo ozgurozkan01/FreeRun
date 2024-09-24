@@ -729,17 +729,20 @@ void UTraversalComponent::DecideTraversalType(bool bActionTriggered)
 						}
 						else
 						{
-							/* MANTLE */
+							if (ValidateMantleSurface()) { SetTraversalAction(ETraversalAction::Mantle); }
+							else						 { SetTraversalAction(ETraversalAction::NoAction); }
 						}
 					}
 					else
 					{
-						/* MANTLE */
+						if (ValidateMantleSurface()) { SetTraversalAction(ETraversalAction::Mantle); }
+						else						 { SetTraversalAction(ETraversalAction::NoAction); }
 					}
 				}
 				else
 				{
-					/* MANTLE */
+					if (ValidateMantleSurface()) { SetTraversalAction(ETraversalAction::Mantle); }
+					else						 { SetTraversalAction(ETraversalAction::NoAction); }
 				}
 				break;
 			}
@@ -888,23 +891,30 @@ void UTraversalComponent::SetTraversalAction(ETraversalAction NewAction)
 			}
 			break;
 		case ETraversalAction::FreeHangHopDown:
-			if (FreeHangHopDown)
+			if (FreeHangHopDownData)
 			{
-				CurrentActionDataRef = FreeHangHopDown;
+				CurrentActionDataRef = FreeHangHopDownData;
 				PlayTraversalMontage();
 			}
 			break;
 		case ETraversalAction::FreeHangHopLeft:
-			if (FreeHangHopLeft)
+			if (FreeHangHopLeftData)
 			{
-				CurrentActionDataRef = FreeHangHopLeft;
+				CurrentActionDataRef = FreeHangHopLeftData;
 				PlayTraversalMontage();
 			}
 			break;
 		case ETraversalAction::FreeHangHopRight:
-			if (FreeHangHopRight)
+			if (FreeHangHopRightData)
 			{
-				CurrentActionDataRef = FreeHangHopRight;
+				CurrentActionDataRef = FreeHangHopRightData;
+				PlayTraversalMontage();
+			}
+			break;
+		case ETraversalAction::Mantle:
+			if (MantleData)
+			{
+				CurrentActionDataRef = MantleData;
 				PlayTraversalMontage();
 			}
 			break;

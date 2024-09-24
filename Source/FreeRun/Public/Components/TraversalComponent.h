@@ -153,13 +153,14 @@ private:
 	UTraversalActionData* BracedHopRightUpData;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UTraversalActionData* BracedHopUpData;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
-	UTraversalActionData* FreeHangHopDown;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
-	UTraversalActionData* FreeHangHopLeft;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
-	UTraversalActionData* FreeHangHopRight;
-
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* FreeHangHopDownData;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* FreeHangHopLeftData;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* FreeHangHopRightData;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* MantleData;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UTraversalActionData* CurrentActionDataRef;
 	
