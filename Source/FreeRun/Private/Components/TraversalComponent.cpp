@@ -293,7 +293,7 @@ void UTraversalComponent::ValidateIsInLand()
 				TraceTypeQuery1,
 				false,
 				ActorsToIgnore,
-				EDrawDebugTrace::ForOneFrame,
+				EDrawDebugTrace::None,
 				BoxHitResult,
 				true);
 		
@@ -304,7 +304,7 @@ void UTraversalComponent::ValidateIsInLand()
 	}
 }
 
-bool UTraversalComponent::ValidateClimbSurface(FVector ImpactLocation)
+bool UTraversalComponent::ValidateClimbMovementSurface(FVector ImpactLocation)
 {
 	// DrawDebugSphere(GetWorld(), ImpactLocation, 12, 12, FColor::Cyan, false, 5);
 	
@@ -318,7 +318,7 @@ bool UTraversalComponent::ValidateClimbSurface(FVector ImpactLocation)
 	TArray<AActor*> ActorsToIgnore;
 	FHitResult SurfaceHit;
 	
-	bool bCanClimbMode = UKismetSystemLibrary::CapsuleTraceSingle(
+	bool bCanClimbMove = UKismetSystemLibrary::CapsuleTraceSingle(
 		this,
 		TraceStart,
 		TraceEnd,
@@ -327,13 +327,13 @@ bool UTraversalComponent::ValidateClimbSurface(FVector ImpactLocation)
 		TraceTypeQuery1,
 		false,
 		ActorsToIgnore,
-		EDrawDebugTrace::ForOneFrame,
+		EDrawDebugTrace::None,
 		SurfaceHit,
 		true,
 		FLinearColor::White,
 		FLinearColor::Gray);
 
-	return !bCanClimbMode;
+	return !bCanClimbMove;
 }
 
 bool UTraversalComponent::ValidateMantleSurface()
@@ -366,6 +366,49 @@ FLinearColor::Gray,
 	return !bCanClimb;
 }
 
+bool UTraversalComponent::ValidateVaultSurface()
+{
+	if (CapsuleComponent)
+	{
+		float CapsuleQuarterHeight = CapsuleComponent->GetScaledCapsuleHalfHeight() / 2.f;
+		float UpValue = CapsuleQuarterHeight + 20;
+		FVector MovedUp = HelperFunc::MoveUp(WallTopResult.ImpactPoint, UpValue);
+
+		TArray<AActor*> ActorsToIgnore;
+		FHitResult VaultHit;;
+		
+		bool bCanVault = UKismetSystemLibrary::CapsuleTraceSingle(
+			this,
+			MovedUp,
+			MovedUp,
+			25,
+			CapsuleQuarterHeight,
+			TraceTypeQuery1,
+			false,
+			ActorsToIgnore,
+			EDrawDebugTrace::None,
+			VaultHit,
+			true);
+
+		return !bCanVault;
+	}
+	
+	return false;
+}
+
+bool UTraversalComponent::ValidateClimbSurface(FVector Location, FRotator Rotation)
+{
+	FVector MovedDown = HelperFunc::MoveDown(Location, 90);
+	FVector MovedBackward = HelperFunc::MoveBackward(MovedDown, 55, Rotation);
+
+	TArray<AActor*> ActorsToIgnore;
+	FHitResult ClimbHit;
+	
+	bool bCanClimb = UKismetSystemLibrary::CapsuleTraceSingle(this, MovedBackward, MovedBackward, 25, 82, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, ClimbHit, true);
+
+	return !bCanClimb;
+}
+
 void UTraversalComponent::ClearTraversalDatas()
 {
 	WallHitResult.Reset();
@@ -393,10 +436,16 @@ void UTraversalComponent::PlayTraversalMontage()
 		
 		FVector TopLocation = FindWarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionDataRef->Warp1XOffset, CurrentActionDataRef->Warp1ZOffset);
 		MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(FName("TopResultWarp"), TopLocation, WallRotation);
+
+		FVector DepthLocation = FindWarpLocation(WallDepthResult.ImpactPoint, WallRotation, CurrentActionDataRef->Warp2XOffset, CurrentActionDataRef->Warp2ZOffset);
+		MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(FName("DepthResultWarp"), DepthLocation, WallRotation);
 		
+		FVector VaultLocation = FindWarpLocation(WallVaultResult.ImpactPoint, WallRotation, CurrentActionDataRef->Warp3XOffset, CurrentActionDataRef->Warp3ZOffset);
+		MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(FName("VaultResultWarp"), VaultLocation, WallRotation);
+
 		FVector BalanceLocation = FindWarpLocation(WallTopResult.ImpactPoint, WallRotation, CurrentActionDataRef->Warp2XOffset, CurrentActionDataRef->Warp2ZOffset);
 		MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(FName("BalanceWarp"), BalanceLocation, WallRotation);
-
+		
 		TraversalAnimInstance->Montage_Play(CurrentActionDataRef->ActionMontage);
 		TraversalAnimInstance->Montage_GetBlendingOutDelegate(CurrentActionDataRef->ActionMontage);
 	}
@@ -435,7 +484,7 @@ void UTraversalComponent::ClimbMovement()
 					FVector TraceEnd = HelperFunc::MoveForward(TraceStart, 60, DirectionRotation);
 					TArray<AActor*> ActorsToIgnore;
 
-					UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbWallHitResult, true, FLinearColor::Black, FLinearColor::Blue, 20);
+					UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, ClimbWallHitResult, true, FLinearColor::Black, FLinearColor::Blue, 20);
 
 					if (!ClimbWallHitResult.bStartPenetrating)
 					{
@@ -453,7 +502,7 @@ void UTraversalComponent::ClimbMovement()
 								FVector Start = HelperFunc::MoveUp(MovedUp, j * 5);
 								FVector End = HelperFunc::MoveDown(Start, 100);
 
-								UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 2.5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbTopHitResult, true, FLinearColor::Red, FLinearColor::Green, 20);
+								UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 2.5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, ClimbTopHitResult, true, FLinearColor::Red, FLinearColor::Green, 20);
 
 								if (ClimbTopHitResult.bStartPenetrating)
 								{
@@ -473,7 +522,7 @@ void UTraversalComponent::ClimbMovement()
 										if (!ClimbSideCheck(ClimbTopHitResult.ImpactPoint))
 										{
 											// DrawDebugSphere(GetWorld(), ClimbWallHitResult.ImpactPoint, 12, 12, FColor::Black);
-											if (!ValidateClimbSurface(ClimbWallHitResult.ImpactPoint))
+											if (!ValidateClimbMovementSurface(ClimbWallHitResult.ImpactPoint))
 											{
 												StopClimbMovement();
 											}
@@ -582,7 +631,7 @@ bool UTraversalComponent::ClimbSideCheck(FVector ImpactPoint)
 		FHitResult ClimbRightResult;
 		TArray<AActor*> ActorsToIgnore;
 		
-		bool bRightHit = UKismetSystemLibrary::LineTraceSingle(this, TraceStart, TraceEnd, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbRightResult, true, FLinearColor::Black, FLinearColor::Blue);
+		bool bRightHit = UKismetSystemLibrary::LineTraceSingle(this, TraceStart, TraceEnd, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, ClimbRightResult, true, FLinearColor::Black, FLinearColor::Blue);
 
 		if (bRightHit && i == 5)
 		{
@@ -608,7 +657,7 @@ void UTraversalComponent::DecideClimbStyle(FVector Location, FRotator Rotation)
 	TArray<AActor*> ActorsToIgnore;
 	FHitResult HitResult;
 	
-	bool bIsTraced = UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 10, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, HitResult, true, FLinearColor::Red, FLinearColor::Green, 20);
+	bool bIsTraced = UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 10, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, HitResult, true, FLinearColor::Red, FLinearColor::Green, 20);
 
 	if (bIsTraced)
 	{
@@ -635,21 +684,22 @@ void UTraversalComponent::DecideClimbOrHop()
 		}
 		else
 		{
-			CurrentClimbHitResult = WallTopResult;
-			CalculateHopLocation();
-			DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
-			NextClimbHitResult = WallTopResult;
-			SetTraversalAction(SelectHopAction());
+			DecideClimbActionBasedOnAirHang();
 		}
 	}
 	else
 	{
-		CurrentClimbHitResult = WallTopResult;
-		CalculateHopLocation();
-		DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
-		NextClimbHitResult = WallTopResult;
-		SetTraversalAction(SelectHopAction());
+		DecideClimbActionBasedOnAirHang();
 	}
+}
+
+void UTraversalComponent::DecideClimbActionBasedOnAirHang()
+{
+	CurrentClimbHitResult = WallTopResult;
+	CalculateHopLocation();
+	DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
+	NextClimbHitResult = WallTopResult;
+	SetTraversalAction(SelectHopAction());
 }
 
 FVector UTraversalComponent::FindWarpLocation(FVector Location, FRotator Rotation, float XOffset, float ZOffset) const
@@ -725,7 +775,8 @@ void UTraversalComponent::DecideTraversalType(bool bActionTriggered)
 					{
 						if (MovementComponent->Velocity.Length() > 20.f)
 						{
-							/* VAULT */
+							if (ValidateVaultSurface()) { SetTraversalAction(ETraversalAction::Vault); }
+							else						 { SetTraversalAction(ETraversalAction::NoAction); }
 						}
 						else
 						{
@@ -749,18 +800,24 @@ void UTraversalComponent::DecideTraversalType(bool bActionTriggered)
 
 			if (WallHeight < 250.f)
 			{
-				DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
-
-				NextClimbHitResult = WallTopResult;
-
-				if (TraversalClimbStyle == EClimbStyle::BracedClimb)
+				if (ValidateClimbSurface(WallTopResult.ImpactPoint, WallRotation))
 				{
-					SetTraversalAction(ETraversalAction::BracedClimb);
+					DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
+
+					NextClimbHitResult = WallTopResult;
+
+					if (TraversalClimbStyle == EClimbStyle::BracedClimb)
+					{
+						SetTraversalAction(ETraversalAction::BracedClimb);
+					}
+					else
+					{
+						SetTraversalAction(ETraversalAction::FreeHang);
+					}	
+					return;
 				}
-				else
-				{
-					SetTraversalAction(ETraversalAction::FreeHang);
-				}	
+
+				SetTraversalAction(ETraversalAction::NoAction);
 			}
 			else
 			{
@@ -769,21 +826,27 @@ void UTraversalComponent::DecideTraversalType(bool bActionTriggered)
 		}
 		else
 		{
-			DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
-
-			NextClimbHitResult = WallTopResult;
-
-			if (ValidateAirHang())
+			if (ValidateClimbSurface(WallTopResult.ImpactPoint, WallRotation))
 			{
-				if (TraversalClimbStyle == EClimbStyle::BracedClimb)
+				DecideClimbStyle(WallTopResult.ImpactPoint, WallRotation);
+
+				NextClimbHitResult = WallTopResult;
+
+				if (ValidateAirHang())
 				{
-					SetTraversalAction(ETraversalAction::BracedClimbFallingClimb);
-				}
-				else
-				{
-					SetTraversalAction(ETraversalAction::FreeHangFallingClimb);
+					if (TraversalClimbStyle == EClimbStyle::BracedClimb)
+					{
+						SetTraversalAction(ETraversalAction::BracedClimbFallingClimb);
+					}
+					else
+					{
+						SetTraversalAction(ETraversalAction::FreeHangFallingClimb);
+					}	
 				}	
-			}	
+				return;
+			}
+
+			SetTraversalAction(ETraversalAction::NoAction);
 		}
 		break;
 	}
@@ -918,6 +981,13 @@ void UTraversalComponent::SetTraversalAction(ETraversalAction NewAction)
 				PlayTraversalMontage();
 			}
 			break;
+		case ETraversalAction::Vault:
+			if (VaultData)
+			{
+				CurrentActionDataRef = VaultData;
+				PlayTraversalMontage();
+			}
+			break;
 		}
 	}
 }
@@ -1012,7 +1082,7 @@ void UTraversalComponent::GridScanner(int Width, int Height, FVector BaseLocatio
 				TArray<AActor*> ActorsToIgnore;
 				
 				FHitResult TopHitResult;
-				bool TraceReturnValue = UKismetSystemLibrary::SphereTraceSingle(this, StartLocation, EndLocation, 2.5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, TopHitResult, true);
+				bool TraceReturnValue = UKismetSystemLibrary::SphereTraceSingle(this, StartLocation, EndLocation, 2.5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, TopHitResult, true);
 				// bool LineTraceReturnValue = GetWorld()->LineTraceSingleByChannel(TopHitResult, StartLocation, EndLocation, ECC_Visibility);
 				// UKismetSystemLibrary::DrawDebugLine(this, StartLocation, EndLocation, FColor::Green);
 
@@ -1041,7 +1111,7 @@ void UTraversalComponent::GridScanner(int Width, int Height, FVector BaseLocatio
 							FVector DepthEnd = LastWallTopResult.ImpactPoint;
 
 
-							bool bIsDepthHit = UKismetSystemLibrary::SphereTraceSingle(this, DepthStart, DepthEnd, 10, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, DepthHitResult, true);
+							bool bIsDepthHit = UKismetSystemLibrary::SphereTraceSingle(this, DepthStart, DepthEnd, 10, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, DepthHitResult, true);
 							// GetWorld()->LineTraceSingleByChannel(DepthHitResult, DepthStart, DepthEnd, ECC_Visibility)
 							if (bIsDepthHit)
 							{
@@ -1053,7 +1123,7 @@ void UTraversalComponent::GridScanner(int Width, int Height, FVector BaseLocatio
 								FVector VaultForward = HelperFunc::MoveForward(WallDepthResult.ImpactPoint, 70, WallRotation);
 								FVector VaultEnd = HelperFunc::MoveDown(VaultForward, 200);
 
-								bool bIsVaultHit = UKismetSystemLibrary::SphereTraceSingle(this, VaultForward, VaultEnd, 10, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, VaultHitResult, true);
+								bool bIsVaultHit = UKismetSystemLibrary::SphereTraceSingle(this, VaultForward, VaultEnd, 10, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, VaultHitResult, true);
 
 								// GetWorld()->LineTraceSingleByChannel(VaultHitResult, VaultForward, VaultEnd, ECC_Visibility)
 								if (bIsVaultHit)
@@ -1194,7 +1264,7 @@ void UTraversalComponent::CalculateNextHandClimbLocationIK(const bool bLeftHand)
 
 				TArray<AActor*> ActorsToIgnore;
 				
-				UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 5,  TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbWallHitResult, true);
+				UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 5,  TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, ClimbWallHitResult, true);
 
 				if (ClimbWallHitResult.bBlockingHit)
 				{
@@ -1210,7 +1280,7 @@ void UTraversalComponent::CalculateNextHandClimbLocationIK(const bool bLeftHand)
 
 						TArray<AActor*> ActorsToIgnore2;
 						
-						UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 5,  TraceTypeQuery1, false, ActorsToIgnore2, EDrawDebugTrace::ForOneFrame, ClimbTopHitResult, true);
+						UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 5,  TraceTypeQuery1, false, ActorsToIgnore2, EDrawDebugTrace::None, ClimbTopHitResult, true);
 
 						if (ClimbTopHitResult.bBlockingHit && !ClimbTopHitResult.bStartPenetrating)
 						{
@@ -1255,7 +1325,7 @@ void UTraversalComponent::CalculateNextLegClimbLocationIK(const bool bLeftLeg)
 			TArray<AActor*> ActorsToIgnore;
 			FHitResult HitResult;
 			
-			bool bIsHit = UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 6, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, HitResult, true);
+			bool bIsHit = UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 6, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, HitResult, true);
 
 			if (bIsHit && TraversalAnimInstance)
 			{
@@ -1287,7 +1357,7 @@ void UTraversalComponent::UpdateHandLocationIK(const bool bLeftHand)
 			TArray<AActor*> ActorsToIgnore;
 			FHitResult ClimbWallHitResult;
 			
-			UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 15, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbWallHitResult, true);
+			UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 15, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, ClimbWallHitResult, true);
 
 			if (ClimbWallHitResult.bBlockingHit && !ClimbWallHitResult.bStartPenetrating)
 			{
@@ -1304,7 +1374,7 @@ void UTraversalComponent::UpdateHandLocationIK(const bool bLeftHand)
 					TArray<AActor*> ActorsToIgnore2;
 					FHitResult ClimbTopHitResult;
 					
-					UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 2.5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, ClimbTopHitResult, true);
+					UKismetSystemLibrary::SphereTraceSingle(this, Start, End, 2.5, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, ClimbTopHitResult, true);
 
 					if (ClimbTopHitResult.bBlockingHit && !ClimbTopHitResult.bStartPenetrating)
 					{
@@ -1362,7 +1432,7 @@ void UTraversalComponent::UpdateLegLocationIK(const bool bLeftLeg)
 				TArray<AActor*> ActorsToIgnore;
 				FHitResult HitResult;
 
-				UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 6, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, HitResult, true);
+				UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 6, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, HitResult, true);
 
 				if (HitResult.bBlockingHit && !HitResult.bStartPenetrating)
 				{
@@ -1406,7 +1476,7 @@ FHitResult UTraversalComponent::DetectWall()
 
 			TArray<AActor*> ActorsToIgnore;
 			
-			UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 10, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, HitResult, true);
+			UKismetSystemLibrary::SphereTraceSingle(this, TraceStart, TraceEnd, 10, TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::None, HitResult, true);
 			// GetWorld()->SweepSingleByChannel(HitResult, TraceStart, TraceEnd, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(10));
 			// UKismetSystemLibrary::DrawDebugLine(this, TraceStart, TraceEnd, FColor::Blue);
 

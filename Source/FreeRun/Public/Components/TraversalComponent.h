@@ -72,6 +72,7 @@ public:
 	void DecideTraversalType(bool bActionTriggered);
 	void DecideClimbStyle(FVector Location, FRotator Rotation);
 	void DecideClimbOrHop();
+	void DecideClimbActionBasedOnAirHang();
 	
 	FORCEINLINE void DeactivateDropping() { bIsDropping = false; }
 	FORCEINLINE ETraversalState GetTraversalState() { return TraversalState; }
@@ -105,10 +106,12 @@ public:
 	float GetTraversalStateValues(ETraversalState CurrentState, float Climb, float FreeRoam, float ReadyToClimb);
 	float GetCharacterHandHeight();
 	
+	bool ValidateClimbMovementSurface(FVector ImpactLocation);
 	bool ValidateAirHang();
 	void ValidateIsInLand();
-	bool ValidateClimbSurface(FVector ImpactLocation);
 	bool ValidateMantleSurface();
+	bool ValidateVaultSurface();
+	bool ValidateClimbSurface(FVector Location, FRotator Rotation);
 	
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
@@ -161,6 +164,9 @@ private:
 	UTraversalActionData* FreeHangHopRightData;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UTraversalActionData* MantleData;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
+	UTraversalActionData* VaultData;
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Reference, meta=(AllowPrivateAccess="true"))
 	UTraversalActionData* CurrentActionDataRef;
 	
